@@ -357,17 +357,39 @@
      */
     findFormQuestions(rootElement) {
       const root = rootElement || document;
-      const questionContainers = Array.from(root.querySelectorAll(
-        '[data-testid*="question"], fieldset, .ia-Questions-item, [class*="question-container"], [class*="form-group"]'
+      const selector = [
+        '[data-testid*="question"]',
+        'fieldset',
+        '.ia-Questions-item',
+        '[class*="Questions-item"]',
+        '[class*="question-container"]',
+        '[class*="form-group"]',
+        '[class*="FormGroup"]',
+        '.ia-BasePage-formGroup',
+        'div[data-testid*="field"]'
+      ].join(', ');
+
+      const containers = Array.from(root.querySelectorAll(selector));
+      const foundElements = new Set(containers);
+
+      // Ensure any interactive fields outside standard containers are captured
+      const allInputs = Array.from(root.querySelectorAll(
+        'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select'
       ));
 
-      if (questionContainers.length > 0) {
-        return questionContainers;
+      for (const input of allInputs) {
+        if (!isElementVisible(input)) continue;
+        const alreadyCovered = containers.some(c => c.contains(input));
+        if (!alreadyCovered) {
+          const wrapper = input.closest('fieldset, form > div, div[class*="field"], div[class*="input"], div[class*="group"]') || input.parentElement;
+          if (wrapper && !foundElements.has(wrapper)) {
+            containers.push(wrapper);
+            foundElements.add(wrapper);
+          }
+        }
       }
 
-      // Fallback: gather all visible interactive fields
-      const inputs = Array.from(root.querySelectorAll('input:not([type="hidden"]), textarea, select'));
-      return inputs.map(input => input.closest('div') || input.parentElement);
+      return containers;
     }
   };
 

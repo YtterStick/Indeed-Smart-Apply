@@ -100,7 +100,40 @@ async function initStorage() {
 
 initStorage();
 
-// Track SmartApply tab creation and lifecycle with strict duplicate tab prevention
+// Safely close an external employer tab, refocus search tab, and advance queue
+async function closeExternalTabAndAdvance(tabId, rawUrl) {
+  let domain = 'external portal';
+  try { domain = new URL(rawUrl).hostname; } catch (_) {}
+
+  logActivity(`[Redirect] External career portal detected (${domain}). Closing tab and moving to next job...`, 'info');
+
+  if (queueState.applicationTabId === tabId) {
+    queueState.applicationTabId = null;
+  }
+
+  try {
+    await chrome.tabs.remove(tabId);
+  } catch (_) {}
+
+  if (queueState.searchTabId && queueState.status === STATE.RUNNING) {
+    try {
+      await chrome.tabs.update(queueState.searchTabId, { active: true });
+    } catch (_) {}
+
+    setTimeout(() => {
+      if (queueState.status === STATE.RUNNING && queueState.searchTabId) {
+        chrome.tabs.sendMessage(queueState.searchTabId, { type: 'NEXT_JOB' }, (res) => {
+          if (chrome.runtime.lastError || !res) {
+            console.log('[StealthBackground] Retrying NEXT_JOB dispatch to search tab...');
+            chrome.tabs.sendMessage(queueState.searchTabId, { type: 'NEXT_JOB' }).catch(() => {});
+          }
+        });
+      }
+    }, 500);
+  }
+}
+
+// Track SmartApply tab creation and lifecycle with duplicate tab prevention
 chrome.tabs.onCreated.addListener((tab) => {
   if (queueState.status === STATE.RUNNING && queueState.searchTabId) {
     // If an application tab is already active, prevent duplicate tabs from multi-clicks or popup races
@@ -109,12 +142,12 @@ chrome.tabs.onCreated.addListener((tab) => {
         try {
           const t = await chrome.tabs.get(tab.id);
           const url = (t.url || t.pendingUrl || '').toLowerCase();
-          if (url.includes('smartapply') || url.includes('indeedapply') || url.includes('indeed.com/apply') || url.includes('indeed.com/viewjob')) {
+          if (url.includes('smartapply') || url.includes('indeedapply') || url.includes('indeed.com/apply') || url.includes('indeed.com/viewjob') || url.includes('/rc/clk')) {
             console.log(`[StealthBackground] Prevented duplicate tab: closing extra application tab ${tab.id}`);
             chrome.tabs.remove(tab.id).catch(() => {});
           }
         } catch (_) {}
-      }, 300);
+      }, 250);
       return;
     }
     queueState.applicationTabId = tab.id;
@@ -125,12 +158,47 @@ chrome.tabs.onCreated.addListener((tab) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (queueState.status !== STATE.RUNNING) return;
 
-  if (tabId === queueState.applicationTabId && changeInfo.status === 'complete') {
-    const url = (tab.url || '').toLowerCase();
-    if (url.includes('indeed.com') || url.includes('smartapply')) {
+  const isRelevantTab = (tabId === queueState.applicationTabId) || (tab.openerTabId && tab.openerTabId === queueState.searchTabId);
+  if (!isRelevantTab || tabId === queueState.searchTabId) return;
+
+  const rawUrl = tab.url || changeInfo.url || '';
+  const url = rawUrl.toLowerCase();
+  if (!url || url.startsWith('about:') || url.startsWith('chrome:')) return;
+
+  // Check if this is an Indeed SmartApply application or mock simulator
+  const isIndeedApply = url.includes('smartapply.indeed.com') ||
+                        url.includes('indeed.com/apply') ||
+                        url.includes('indeed.com/viewjob') ||
+                        url.includes('indeed.com/jobs/view') ||
+                        url.includes('indeed.com/m/viewjob') ||
+                        url.includes('mock-indeed-wizard') ||
+                        url.includes('localhost') ||
+                        url.includes('127.0.0.1');
+
+  // /rc/clk is Indeed's outbound click tracking redirect to external company websites
+  const isOutboundRedirect = url.includes('/rc/clk');
+
+  if (isIndeedApply && !isOutboundRedirect) {
+    if (changeInfo.status === 'complete') {
       console.log(`[StealthBackground] Application tab ${tabId} loaded. Injecting solver...`);
       await sleep(600);
       await ensureSolverInjected(tabId);
+    }
+  } else if (!url.includes('indeed.com') || isOutboundRedirect) {
+    if (isOutboundRedirect && url.includes('indeed.com')) {
+      // Give the tracking 302 redirect 1.2s to finish resolving to the employer domain
+      setTimeout(async () => {
+        try {
+          const currentTab = await chrome.tabs.get(tabId);
+          const currentUrl = (currentTab.url || '').toLowerCase();
+          if (!currentUrl.includes('smartapply') && !currentUrl.includes('indeed.com/apply')) {
+            await closeExternalTabAndAdvance(tabId, currentTab.url || rawUrl);
+          }
+        } catch (_) {}
+      }, 1200);
+    } else {
+      // Direct navigation or completed redirect to external company portal (Workday, Greenhouse, etc.)
+      await closeExternalTabAndAdvance(tabId, rawUrl);
     }
   }
 });
@@ -140,8 +208,18 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   if (tabId === queueState.applicationTabId) {
     console.log(`[StealthBackground] Application tab ${tabId} closed.`);
     queueState.applicationTabId = null;
-    if (queueState.searchTabId) {
+    if (queueState.searchTabId && queueState.status === STATE.RUNNING) {
       chrome.tabs.update(queueState.searchTabId, { active: true }).catch(() => {});
+      // Advance to next job after application tab closes
+      setTimeout(() => {
+        if (queueState.status === STATE.RUNNING && queueState.searchTabId) {
+          chrome.tabs.sendMessage(queueState.searchTabId, { type: 'NEXT_JOB' }, (res) => {
+            if (chrome.runtime.lastError || !res) {
+              chrome.tabs.sendMessage(queueState.searchTabId, { type: 'NEXT_JOB' }).catch(() => {});
+            }
+          });
+        }
+      }, 800);
     }
   }
 });
@@ -254,58 +332,89 @@ async function dispatchTrustedHardwareClick(tabId, targetCoords) {
   return true;
 }
 
-// Gemini API Fallback for dynamic screening questions
-async function queryGeminiForAnswer(questionText, questionType, profile, jobTitle) {
+// Gemini API Fallback for dynamic screening questions (supports text, number, radio choices, dropdowns)
+async function queryGeminiForAnswer(questionText, questionType, profile, jobTitle, options = []) {
   const storage = await chrome.storage.local.get(['stealthConfig']);
-  const apiKey = storage.stealthConfig?.geminiApiKey;
+  const apiKey = (storage.stealthConfig?.geminiApiKey || '').trim();
 
   if (!apiKey) {
+    console.warn('[StealthBackground] No Gemini API key provided in settings');
     return { success: false, reason: 'No Gemini API key provided' };
   }
 
-  const prompt = `You are an AI assistant answering job application screening questions accurately based on this candidate profile:
+  let prompt = `You are an expert AI job applicant assisting in answering employer screening questions accurately on behalf of this candidate:
+
 Candidate Profile:
 ${JSON.stringify(profile, null, 2)}
 
-Job Title: ${jobTitle || 'Relevant Position'}
+Target Job: ${jobTitle || 'Relevant Position'}
 Screening Question: "${questionText}"
-Question Type: ${questionType}
+Field Type: ${questionType}
+`;
+
+  if (options && options.length > 0) {
+    prompt += `
+Available Choices:
+${options.map((opt, i) => `${i + 1}. "${opt}"`).join('\n')}
 
 Instructions:
-- If this is a number question (e.g. "How many years of experience...?"), reply with ONLY a single integer or number matching candidate skills.
+- Carefully evaluate the candidate's skills, qualifications, background, and location.
+- Choose the single BEST matching choice from the Available Choices list above.
+- If it is a Yes/No question and the candidate is qualified or willing, choose "Yes".
+- Output ONLY the exact text of the selected choice from the list without numbers, quotes, or markdown.`;
+  } else {
+    prompt += `
+Instructions:
+- If this is a numeric question (e.g. "How many years of experience...?"), reply with ONLY a single integer or number (e.g. 4) based on candidate skills.
 - If this is a Yes/No question, reply with ONLY "Yes" or "No".
-- If this asks for a short text response, provide a professional, concise response (1-2 sentences) aligned with the candidate's profile.
-- If uncertain or if the candidate profile clearly does not fit, say "UNKNOWN".
+- If this is a salary question, reply with a reasonable number matching candidate expectations.
+- If this is an open-ended question, reply with a professional, concise answer (1-2 sentences) directly based on candidate skills and experience.
+- If completely unknown or irrelevant, reply with "UNKNOWN".
 
-Output ONLY the answer without markdown, quotes, or conversational filler.`;
-
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 60 }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Gemini API returned status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const candidateAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (!candidateAnswer || candidateAnswer.toUpperCase().includes('UNKNOWN')) {
-      return { success: false, reason: 'Gemini indicated UNKNOWN answer' };
-    }
-
-    return { success: true, answer: candidateAnswer };
-  } catch (err) {
-    logActivity(`Gemini fallback error: ${err.message}`, 'warning');
-    return { success: false, reason: err.message };
+Output ONLY the exact answer without quotes, conversational filler, or markdown.`;
   }
+
+  // Model endpoints to try in order of capability and speed
+  const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 150
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[StealthBackground] Gemini model ${model} error (${response.status}):`, errText);
+        continue;
+      }
+
+      const data = await response.json();
+      const candidateAnswer = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+      if (!candidateAnswer || candidateAnswer.toUpperCase() === 'UNKNOWN') {
+        return { success: false, reason: 'AI indicated UNKNOWN' };
+      }
+
+      const cleaned = candidateAnswer.replace(/^["']|["']$/g, '').trim();
+      logActivity(`[AI Solver] Answered: "${cleaned}" for "${questionText.substring(0, 35)}..."`, 'info');
+      return { success: true, answer: cleaned };
+    } catch (err) {
+      console.warn(`[StealthBackground] Failed with ${model}:`, err);
+    }
+  }
+
+  logActivity(`AI could not resolve question: "${questionText.substring(0, 45)}..."`, 'warning');
+  return { success: false, reason: 'Gemini request failed or returned empty' };
 }
 
 // Behavioral Throttling & Cooldown Manager
@@ -464,6 +573,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
     }
 
+    case 'EXTERNAL_REDIRECT_DETECTED': {
+      (async () => {
+        const targetTabId = sender?.tab?.id || queueState.applicationTabId;
+        if (targetTabId) {
+          await closeExternalTabAndAdvance(targetTabId, message.url || '');
+        }
+        sendResponse({ success: true });
+      })();
+      return true;
+    }
+
     // 3. AI screening question fallback
     case 'SOLVE_WITH_AI': {
       (async () => {
@@ -471,7 +591,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           message.questionText,
           message.questionType,
           message.profile,
-          queueState.currentJobTitle
+          queueState.currentJobTitle,
+          message.options || []
         );
         sendResponse(result);
       })();

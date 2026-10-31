@@ -79,13 +79,15 @@ Most job application bots get detected and restricted quickly because they rely 
 
 A common problem with web automation on job platforms is that clicking an "Apply now" button can trigger multi-burst clicks (e.g. physical click + synthetic event + child span click), causing Chrome to open **2 or 3 duplicate tabs for the same employer**.
 
-Indeed Stealth SmartApply features a **Dual-Layer Tab Protection Engine**:
+Indeed Stealth SmartApply features a **Triple-Layer Tab Protection & External Redirect Engine**:
 1. **Single-Dispatch Mutex (`isApplyingCurrentJob`):**
    - The scanner dispatches a single hardware click to the target button. Secondary synthetic clicks and child element clicks are strictly inhibited.
    - The scanner locks state until the application is either submitted or closed, preventing re-entrant card clicks.
 2. **Background Tab Deduplicator:**
    - The background service worker actively intercepts newly created tabs.
    - If an application tab is already active and another tab attempts to open for the same job URL, the duplicate tab is immediately intercepted and closed.
+3. **External Redirect Auto-Close & Auto-Advance:**
+   - If an employer's apply button redirects away from Indeed to an external career portal (such as Workday, Greenhouse, Taleo, Lever, or employer custom site), the background worker detects the external domain, immediately **closes the external tab**, refocuses your Indeed search tab, and advances to the next job in your queue without getting stuck.
 
 ---
 
@@ -245,10 +247,17 @@ Switch to the **Settings** tab:
 
 ### Step 6: AI Screening Assistant Setup (Optional)
 
-For unexpected free-text questions (e.g. *"Describe your experience with MVI / MVVM architecture"*):
+Indeed Stealth SmartApply features an **Omni-Type AI Screening Engine** powered by Google Gemini:
+1. **Radio Groups & Multiple Choice:** Extracts question context and allowed choices, prompts Gemini to select the single best matching answer based on your profile and skills, and clicks the target option.
+2. **Dropdown `<select>` Menus:** Evaluates all `<option>` choices against candidate qualifications to make natural, accurate selections.
+3. **Consents & Checkboxes:** Verifies agreements, background check terms, and matches multi-select skill checkmarks.
+4. **Numeric Experience & Rates:** Calculates years of experience for unlisted skills or extracts hourly/monthly rates.
+5. **Open-Ended Free Text & Textareas:** Generates concise, professional 1-2 sentence responses directly aligned with your experience.
+
+**How to Enable AI:**
 1. Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
-2. Paste it into **Google Gemini API Key** in the Settings tab and click **Save Settings**.
-3. Keys are stored strictly locally in your browser's private Chrome storage.
+2. Paste it into **Google Gemini API Key** under the **Settings** tab in the extension popup and click **Save Settings**.
+3. Keys are stored strictly locally in your browser's private Chrome storage and never transmitted to any third-party server.
 
 ---
 

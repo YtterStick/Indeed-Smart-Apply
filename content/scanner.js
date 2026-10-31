@@ -575,7 +575,7 @@
     let applicationActive = false;
     for (let w = 0; w < 16; w++) {
       await Stealth.sleep(500);
-      if (!isScanning || isPaused) {
+      if (!isScanning || isPaused || !isApplyingCurrentJob) {
         isApplyingCurrentJob = false;
         return;
       }

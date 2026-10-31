@@ -199,8 +199,11 @@
     }
 
     // 5. Screening Questions
+    const hasInputs = !!document.querySelector(
+      'textarea, select, input[type="radio"], input[type="checkbox"], input[type="number"], [data-testid*="question"]'
+    );
     const questions = Stealth.Selectors.findFormQuestions(document);
-    if (questions.length > 0 || bodyText.includes('questions from the employer') || bodyText.includes('qualifications')) {
+    if (questions.length > 0 || hasInputs || bodyText.includes('questions from the employer') || bodyText.includes('qualifications') || bodyText.includes('screening')) {
       return 'QUESTIONS';
     }
 
@@ -272,137 +275,441 @@
     return true;
   }
 
-  // Solve Employer Screening Questions
+  // Helper: Extract clean question text for any input or group
+  function getQuestionTextForInput(element, container) {
+    if (!element) return '';
+
+    // 1. Legend in enclosing or closest fieldset
+    const fieldset = element.closest('fieldset');
+    if (fieldset) {
+      const legend = fieldset.querySelector('legend');
+      if (legend && legend.innerText.trim()) {
+        return legend.innerText.trim();
+      }
+    }
+
+    // 2. Explicit label with 'for' attribute matching element ID
+    if (element.id) {
+      const explicitLabel = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+      if (explicitLabel && explicitLabel.innerText.trim()) {
+        return explicitLabel.innerText.trim();
+      }
+    }
+
+    // 3. Parent label (for text, select, or textarea - avoid option labels of radios/checkboxes)
+    if (!element.matches('input[type="radio"], input[type="checkbox"]')) {
+      const parentLabel = element.closest('label');
+      if (parentLabel && parentLabel.innerText.trim().length > 3) {
+        return parentLabel.innerText.trim();
+      }
+    }
+
+    // 4. ARIA label or aria-labelledby
+    const ariaLabel = element.getAttribute('aria-label');
+    if (ariaLabel && ariaLabel.trim()) return ariaLabel.trim();
+
+    const labelledBy = element.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const labelEl = document.getElementById(labelledBy);
+      if (labelEl && labelEl.innerText.trim()) return labelEl.innerText.trim();
+    }
+
+    // 5. Container heading or label element
+    const cont = container || element.closest('.ia-Questions-item, [class*="Questions-item"], [data-testid*="question"], [class*="form-group"], div[class*="field"]') || element.parentElement;
+    if (cont) {
+      const header = cont.querySelector('label, [class*="label"], [class*="title"], [class*="header"], h2, h3, h4, h5, legend, p');
+      if (header && header !== element && header.innerText.trim()) {
+        return header.innerText.trim();
+      }
+      const rawText = cont.innerText.trim();
+      if (rawText.length > 2) return rawText.split('\n')[0].trim();
+    }
+
+    return element.getAttribute('placeholder') || element.name || '';
+  }
+
+  // Helper: Get label text for a radio or checkbox option
+  function getOptionLabel(inputElement) {
+    const parentLabel = inputElement.closest('label');
+    if (parentLabel && parentLabel.innerText.trim()) {
+      return parentLabel.innerText.trim();
+    }
+    if (inputElement.id) {
+      const labelFor = document.querySelector(`label[for="${CSS.escape(inputElement.id)}"]`);
+      if (labelFor && labelFor.innerText.trim()) {
+        return labelFor.innerText.trim();
+      }
+    }
+    return inputElement.value || inputElement.getAttribute('aria-label') || '';
+  }
+
+  // Solve Employer Screening Questions (covers Radio groups, Selects, Checkboxes, Numbers, and Textareas)
   async function solveQuestionsStep() {
     console.log('[StealthSolver] Solving Screening Questions step...');
-    const profile = candidateProfile;
-    const questions = Stealth.Selectors.findFormQuestions(document);
+    const profile = candidateProfile || {};
 
-    for (const qContainer of questions) {
-      const qText = (qContainer.innerText || qContainer.textContent || '').trim();
+    // 1. Process all Radio Button Groups (grouped by name or parent fieldset/container)
+    const radioElements = Array.from(document.querySelectorAll('input[type="radio"]')).filter(r => Stealth.isElementVisible(r));
+    const radioGroups = new Map();
+
+    for (const radio of radioElements) {
+      const groupKey = radio.name || radio.closest('fieldset')?.id || radio.closest('fieldset') || radio.closest('.ia-Questions-item') || radio.parentElement;
+      if (!radioGroups.has(groupKey)) {
+        radioGroups.set(groupKey, []);
+      }
+      radioGroups.get(groupKey).push(radio);
+    }
+
+    for (const [_, groupRadios] of radioGroups) {
+      // If any radio in this group is already selected, skip
+      if (groupRadios.some(r => r.checked)) continue;
+
+      const firstRadio = groupRadios[0];
+      const qText = getQuestionTextForInput(firstRadio);
       const qLower = qText.toLowerCase();
 
-      // 1. Number / Years of experience
-      const numberInput = qContainer.querySelector('input[type="number"], input[inputmode="numeric"]');
-      if (numberInput && !numberInput.value) {
-        let years = profile.defaultYearsExperience || 3;
+      const optionsWithLabels = groupRadios.map(r => ({
+        radio: r,
+        label: getOptionLabel(r)
+      }));
+      const optionTexts = optionsWithLabels.map(o => o.label).filter(Boolean);
 
-        // Check if question asks about specific skill
-        for (const [skill, val] of Object.entries(profile.yearsOfExperienceBySkill || {})) {
-          if (qLower.includes(skill.toLowerCase())) {
-            years = val;
+      let targetRadio = null;
+
+      // A. Standard profile heuristics
+      if (qLower.includes('require sponsorship') || qLower.includes('visa sponsorship') || qLower.includes('work authorization sponsorship')) {
+        const wantYes = !!profile.sponsorshipRequired;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      } else if (qLower.includes('authorized to work') || qLower.includes('legally authorized') || qLower.includes('work authorization') || qLower.includes('eligible to work')) {
+        const wantYes = profile.workAuthorization !== false;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      } else if (qLower.includes('willing to relocate') || qLower.includes('relocation')) {
+        const wantYes = !!profile.relocationWillingness;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      } else if (qLower.includes('night shift') || qLower.includes('graveyard')) {
+        const wantYes = !!profile.nightShiftWillingness;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      } else if (qLower.includes('driver') && qLower.includes('license')) {
+        const wantYes = profile.driverLicense !== false;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      } else if (qLower.includes('background check') || qLower.includes('drug test')) {
+        const wantYes = profile.backgroundCheckConsent !== false;
+        targetRadio = optionsWithLabels.find(o => wantYes ? /\byes\b/i.test(o.label) : /\bno\b/i.test(o.label))?.radio;
+      }
+
+      // B. Custom Answers matching
+      if (!targetRadio && profile.customAnswers) {
+        for (const [k, ans] of Object.entries(profile.customAnswers)) {
+          if (qLower.includes(k.toLowerCase())) {
+            const ansLower = String(ans).toLowerCase();
+            targetRadio = optionsWithLabels.find(o => o.label.toLowerCase().includes(ansLower) || ansLower.includes(o.label.toLowerCase()))?.radio;
+            if (targetRadio) break;
+          }
+        }
+      }
+
+      // C. Call Gemini AI with all options
+      if (!targetRadio && optionTexts.length > 0) {
+        const aiResponse = await sendBgMessage({
+          type: 'SOLVE_WITH_AI',
+          questionText: qText,
+          questionType: 'radio',
+          options: optionTexts,
+          profile: profile
+        });
+
+        if (aiResponse && aiResponse.success && aiResponse.answer) {
+          const aiAns = aiResponse.answer.toLowerCase().trim();
+          targetRadio = optionsWithLabels.find(o => {
+            const l = o.label.toLowerCase().trim();
+            return l === aiAns || l.includes(aiAns) || aiAns.includes(l);
+          })?.radio;
+        }
+      }
+
+      // D. Fallback: Default to 'yes' if present, otherwise first option
+      if (!targetRadio) {
+        targetRadio = optionsWithLabels.find(o => /\byes\b/i.test(o.label))?.radio || groupRadios[0];
+      }
+
+      if (targetRadio) {
+        targetRadio.checked = true;
+        Stealth.setNativeValue(targetRadio, targetRadio.value);
+        targetRadio.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        targetRadio.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+        targetRadio.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+        await Stealth.sleep(Stealth.getRandomInt(250, 450));
+      }
+    }
+
+    // 2. Process all Select Dropdowns
+    const selectElements = Array.from(document.querySelectorAll('select')).filter(s => Stealth.isElementVisible(s));
+
+    for (const selectEl of selectElements) {
+      if (selectEl.value && selectEl.value !== '') continue;
+
+      const qText = getQuestionTextForInput(selectEl);
+      const qLower = qText.toLowerCase();
+
+      const availableOptions = Array.from(selectEl.options)
+        .filter(opt => opt.value !== '' && !opt.disabled && opt.text.trim())
+        .map(opt => opt.text.trim());
+
+      let chosenText = null;
+
+      // A. Education Level
+      if (qLower.includes('education') || qLower.includes('degree')) {
+        chosenText = profile.educationLevel || "Bachelor's Degree";
+      } else if (qLower.includes('notice period') || qLower.includes('start date') || qLower.includes('availability')) {
+        chosenText = profile.noticePeriod || '2 weeks';
+      }
+
+      // B. Custom Answers
+      if (!chosenText && profile.customAnswers) {
+        for (const [k, ans] of Object.entries(profile.customAnswers)) {
+          if (qLower.includes(k.toLowerCase())) {
+            chosenText = String(ans);
             break;
           }
         }
-
-        await Stealth.humanType(numberInput, String(years));
-        continue;
       }
 
-      // 2. Radio group (Yes / No questions)
-      const radioInputs = Array.from(qContainer.querySelectorAll('input[type="radio"]'));
-      if (radioInputs.length >= 2) {
-        const isChecked = radioInputs.some(r => r.checked);
-        if (!isChecked) {
-          let desiredChoice = 'yes'; // Default positive response
+      // C. Call Gemini AI with available options
+      if (!chosenText && availableOptions.length > 0) {
+        const aiResponse = await sendBgMessage({
+          type: 'SOLVE_WITH_AI',
+          questionText: qText,
+          questionType: 'select',
+          options: availableOptions,
+          profile: profile
+        });
 
-          if (qLower.includes('require sponsorship') || qLower.includes('visa sponsorship')) {
-            desiredChoice = profile.sponsorshipRequired ? 'yes' : 'no';
-          } else if (qLower.includes('authorized to work') || qLower.includes('legally authorized')) {
-            desiredChoice = profile.workAuthorization ? 'yes' : 'no';
-          } else if (qLower.includes('willing to relocate') || qLower.includes('relocation')) {
-            desiredChoice = profile.relocationWillingness ? 'yes' : 'no';
-          } else if (qLower.includes('night shift') || qLower.includes('graveyard')) {
-            desiredChoice = profile.nightShiftWillingness ? 'yes' : 'no';
-          } else if (qLower.includes('valid driver') || qLower.includes('license')) {
-            desiredChoice = profile.driverLicense ? 'yes' : 'no';
-          } else if (qLower.includes('background check')) {
-            desiredChoice = profile.backgroundCheckConsent ? 'yes' : 'no';
-          }
-
-          const targetRadio = radioInputs.find(r => {
-            const parentText = (r.closest('label')?.innerText || r.parentElement?.innerText || r.value || '').toLowerCase();
-            return parentText.includes(desiredChoice);
-          }) || radioInputs[0];
-
-          if (targetRadio) {
-            targetRadio.checked = true;
-            Stealth.setNativeValue(targetRadio, targetRadio.value);
-            targetRadio.dispatchEvent(new Event('change', { bubbles: true }));
-            targetRadio.dispatchEvent(new Event('click', { bubbles: true }));
-            await Stealth.sleep(Stealth.getRandomInt(200, 500));
-          }
+        if (aiResponse && aiResponse.success && aiResponse.answer) {
+          chosenText = aiResponse.answer;
         }
-        continue;
       }
 
-      // 3. Dropdown / Select
-      const selectEl = qContainer.querySelector('select');
-      if (selectEl && (!selectEl.value || selectEl.value === '')) {
-        let choice = "Bachelor's Degree";
-        if (qLower.includes('education') || qLower.includes('degree')) {
-          choice = profile.educationLevel || "Bachelor's";
-        } else if (qLower.includes('notice period') || qLower.includes('start date')) {
-          choice = profile.noticePeriod || '2 weeks';
-        }
-        await Stealth.humanSelect(selectEl, choice);
-        continue;
+      // D. Fallback to first valid option
+      if (!chosenText && availableOptions.length > 0) {
+        chosenText = availableOptions[0];
       }
 
-      // 4. Free text / Textarea
-      const textInput = qContainer.querySelector('textarea, input[type="text"]');
-      if (textInput && !textInput.value) {
-        // Check local custom answers
-        let answered = false;
-        for (const [key, answer] of Object.entries(profile.customAnswers || {})) {
-          if (qLower.includes(key.toLowerCase())) {
-            await Stealth.humanType(textInput, answer);
-            answered = true;
+      if (chosenText) {
+        await Stealth.humanSelect(selectEl, chosenText);
+        await Stealth.sleep(Stealth.getRandomInt(250, 450));
+      }
+    }
+
+    // 3. Process all Checkboxes
+    const checkboxElements = Array.from(document.querySelectorAll('input[type="checkbox"]')).filter(c => Stealth.isElementVisible(c));
+
+    for (const chk of checkboxElements) {
+      if (chk.checked) continue;
+
+      const labelText = getOptionLabel(chk);
+      const qText = getQuestionTextForInput(chk);
+      const combinedText = `${qText} ${labelText}`.toLowerCase();
+
+      let shouldCheck = false;
+
+      // A. Agreement, terms, acknowledgment, certification, truthfulness
+      if (
+        combinedText.includes('agree') ||
+        combinedText.includes('certify') ||
+        combinedText.includes('consent') ||
+        combinedText.includes('confirm') ||
+        combinedText.includes('acknowledge') ||
+        combinedText.includes('truthful') ||
+        combinedText.includes('accurate') ||
+        combinedText.includes('terms') ||
+        combinedText.includes('policy') ||
+        combinedText.includes('understand') ||
+        combinedText.includes('authorized')
+      ) {
+        shouldCheck = true;
+      }
+
+      // B. Candidate skills matching
+      if (!shouldCheck && profile.skills && Array.isArray(profile.skills)) {
+        for (const skill of profile.skills) {
+          const sLower = (skill || '').toLowerCase().trim();
+          if (sLower && combinedText.includes(sLower)) {
+            shouldCheck = true;
             break;
           }
         }
+      }
 
-        // Check salary question
-        if (!answered && (qLower.includes('salary') || qLower.includes('compensation') || qLower.includes('pay rate') || qLower.includes('expected pay'))) {
-          if (profile.salaryExpectation && profile.salaryExpectation.amount) {
-            const salStr = `${profile.salaryExpectation.currency || 'USD'} ${profile.salaryExpectation.amount.toLocaleString()} / ${profile.salaryExpectation.period || 'Annual'}`;
-            await Stealth.humanType(textInput, salStr);
-            answered = true;
+      // C. AI verification for ambiguous checkboxes
+      if (!shouldCheck) {
+        const aiResponse = await sendBgMessage({
+          type: 'SOLVE_WITH_AI',
+          questionText: qText || labelText,
+          questionType: 'checkbox',
+          options: ['Check (Yes / Agree)', 'Do not check (No / Disagree)'],
+          profile: profile
+        });
+
+        if (aiResponse && aiResponse.success && aiResponse.answer) {
+          const ans = aiResponse.answer.toLowerCase();
+          if (ans.includes('check') || ans.includes('yes') || ans.includes('agree')) {
+            shouldCheck = true;
           }
         }
+      }
 
-        // Check availability / notice period question
-        if (!answered && (qLower.includes('notice period') || qLower.includes('start date') || qLower.includes('when can you start') || qLower.includes('available to start'))) {
-          if (profile.noticePeriod) {
-            await Stealth.humanType(textInput, profile.noticePeriod);
-            answered = true;
-          }
-        }
+      if (shouldCheck) {
+        chk.checked = true;
+        Stealth.setNativeValue(chk, true);
+        chk.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        chk.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+        chk.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+        await Stealth.sleep(Stealth.getRandomInt(200, 400));
+      }
+    }
 
-        // If not found, try Gemini AI fallback
-        if (!answered) {
-          const aiResponse = await sendBgMessage({
-            type: 'SOLVE_WITH_AI',
-            questionText: qText,
-            questionType: textInput.tagName.toLowerCase(),
-            profile: profile
-          });
+    // 4. Process all Numeric Inputs
+    const numberElements = Array.from(document.querySelectorAll('input[type="number"], input[inputmode="numeric"]')).filter(n => Stealth.isElementVisible(n));
 
-          if (aiResponse && aiResponse.success && aiResponse.answer) {
-            await Stealth.humanType(textInput, aiResponse.answer);
+    for (const numInput of numberElements) {
+      if (numInput.value && numInput.value.trim() !== '') continue;
+
+      const qText = getQuestionTextForInput(numInput);
+      const qLower = qText.toLowerCase();
+
+      let val = null;
+
+      // A. Salary / Compensation / Rate
+      if (qLower.includes('salary') || qLower.includes('pay') || qLower.includes('compensation') || qLower.includes('rate') || qLower.includes('hourly') || qLower.includes('earning')) {
+        if (profile.salaryExpectation && profile.salaryExpectation.amount) {
+          if (qLower.includes('hour')) {
+            val = Math.round(profile.salaryExpectation.amount / (profile.salaryExpectation.period === 'Yearly' ? 2080 : 160));
           } else {
-            // Trigger Sentinel for human intervention
-            Stealth.playNotificationChime();
-            activeSentinelCleanup = Stealth.highlightSentinelElement(
-              qContainer,
-              'Question needs human attention'
-            );
-            await sendBgMessage({
-              type: 'TRIGGER_SENTINEL',
-              reason: `Unanswered screening question: "${qText.substring(0, 60)}..."`
-            });
-            return false;
+            val = profile.salaryExpectation.amount;
           }
+        }
+      }
+
+      // B. Years of experience matching skills
+      if (val === null && profile.yearsOfExperienceBySkill) {
+        for (const [skill, years] of Object.entries(profile.yearsOfExperienceBySkill)) {
+          if (qLower.includes(skill.toLowerCase())) {
+            val = years;
+            break;
+          }
+        }
+      }
+
+      // C. Call Gemini AI
+      if (val === null) {
+        const aiResponse = await sendBgMessage({
+          type: 'SOLVE_WITH_AI',
+          questionText: qText,
+          questionType: 'number',
+          profile: profile
+        });
+
+        if (aiResponse && aiResponse.success && aiResponse.answer) {
+          const match = aiResponse.answer.match(/\d+/);
+          if (match) {
+            val = parseInt(match[0], 10);
+          }
+        }
+      }
+
+      // D. Fallback default
+      if (val === null) {
+        val = profile.defaultYearsExperience || 3;
+      }
+
+      await Stealth.humanType(numInput, String(val));
+      await Stealth.sleep(Stealth.getRandomInt(250, 450));
+    }
+
+    // 5. Process all Textarea and Text Inputs
+    const textElements = Array.from(document.querySelectorAll(
+      'textarea, input[type="text"], input[type="tel"], input:not([type])'
+    )).filter(t => Stealth.isElementVisible(t));
+
+    for (const textInput of textElements) {
+      if (textInput.value && textInput.value.trim() !== '') continue;
+
+      const qText = getQuestionTextForInput(textInput);
+      const qLower = qText.toLowerCase();
+
+      let answer = null;
+
+      // A. Location / City / Address
+      if (qLower.includes('city') || qLower.includes('location') || qLower.includes('address') || qLower.includes('where do you live')) {
+        answer = profile.location || 'Remote, Manila, Philippines';
+      } else if (qLower.includes('postal') || qLower.includes('zip')) {
+        answer = profile.postalCode || '1000';
+      }
+
+      // B. URLs (LinkedIn, GitHub, Portfolio)
+      if (!answer) {
+        if (qLower.includes('linkedin')) {
+          answer = profile.linkedinUrl || profile.customAnswers?.['LinkedIn'] || 'https://linkedin.com/in/mark-android-dev';
+        } else if (qLower.includes('github')) {
+          answer = profile.githubUrl || profile.customAnswers?.['GitHub'] || 'https://github.com/YtterStick';
+        } else if (qLower.includes('portfolio') || qLower.includes('website')) {
+          answer = profile.portfolioUrl || 'https://github.com/YtterStick';
+        }
+      }
+
+      // C. Salary Expectation
+      if (!answer && (qLower.includes('salary') || qLower.includes('compensation') || qLower.includes('pay rate') || qLower.includes('expected pay'))) {
+        if (profile.salaryExpectation && profile.salaryExpectation.amount) {
+          const curr = profile.salaryExpectation.currency || 'PHP';
+          const amt = profile.salaryExpectation.amount.toLocaleString();
+          const per = profile.salaryExpectation.period || 'Month';
+          answer = `${curr} ${amt} / ${per}`;
+        }
+      }
+
+      // D. Notice Period / Start Date
+      if (!answer && (qLower.includes('notice period') || qLower.includes('start date') || qLower.includes('when can you start') || qLower.includes('available to start'))) {
+        answer = profile.noticePeriod || '2 weeks';
+      }
+
+      // E. Custom Answers
+      if (!answer && profile.customAnswers) {
+        for (const [key, val] of Object.entries(profile.customAnswers)) {
+          if (qLower.includes(key.toLowerCase())) {
+            answer = val;
+            break;
+          }
+        }
+      }
+
+      // F. Call Gemini AI
+      if (!answer) {
+        const aiResponse = await sendBgMessage({
+          type: 'SOLVE_WITH_AI',
+          questionText: qText,
+          questionType: textInput.tagName.toLowerCase(),
+          profile: profile
+        });
+
+        if (aiResponse && aiResponse.success && aiResponse.answer) {
+          answer = aiResponse.answer;
+        }
+      }
+
+      // G. Submit Answer or Trigger Sentinel if required
+      if (answer) {
+        await Stealth.humanType(textInput, answer);
+        await Stealth.sleep(Stealth.getRandomInt(250, 500));
+      } else {
+        const isRequired = textInput.required || textInput.getAttribute('aria-required') === 'true' || qText.includes('*');
+        if (isRequired) {
+          Stealth.playNotificationChime();
+          activeSentinelCleanup = Stealth.highlightSentinelElement(textInput, 'Question needs human attention');
+          await sendBgMessage({
+            type: 'TRIGGER_SENTINEL',
+            reason: `Unanswered screening question: "${qText.substring(0, 60)}..."`
+          });
+          return false;
         }
       }
     }
@@ -585,6 +892,15 @@
   // Check if an application modal or form is currently active in this frame
   function isApplicationFormActive() {
     const href = (window.location.href || '').toLowerCase();
+
+    // Check if top frame redirected to an external career portal
+    if (!isIframe) {
+      const isInternal = href.includes('indeed.com') || href.includes('mock-indeed-wizard') || href.includes('localhost') || href.includes('127.0.0.1');
+      if (!isInternal && !href.startsWith('about:') && !href.startsWith('chrome:')) {
+        sendBgMessage({ type: 'EXTERNAL_REDIRECT_DETECTED', url: window.location.href });
+        return false;
+      }
+    }
 
     // Exclude third-party tracking/recaptcha iframes
     if (isIframe) {
