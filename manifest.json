@@ -1,0 +1,80 @@
+{
+  "manifest_version": 3,
+  "name": "Indeed Stealth SmartApply",
+  "version": "1.0.3",
+  "description": "High-stealth Indeed automated job applicant with CDP hardware clicks, React 18 bypass, and behavioral pacing.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "activeTab",
+    "debugger",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://*.indeed.com/*",
+    "*://*.smartapply.indeed.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.indeed.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "utils/dom-stealth.js",
+        "content/scanner.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://*.indeed.com/*",
+        "*://*.smartapply.indeed.com/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "utils/dom-stealth.js",
+        "content/solver.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Indeed Stealth SmartApply",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "utils/dom-stealth.js",
+        "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

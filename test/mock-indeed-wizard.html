@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indeed SmartApply Local Mock Simulator</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --primary: #2557a7; /* Indeed Blue */
+      --primary-hover: #1c3f7a;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Left / Main View: Simulated Indeed Search Page */
+    .indeed-view {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .search-header {
+      background: var(--card-bg);
+      padding: 18px 24px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .search-header h1 { font-size: 20px; color: #fff; margin-bottom: 6px; }
+    .search-header p { font-size: 13px; color: var(--text-muted); }
+
+    /* Job Card */
+    .job_seen_beacon {
+      background: var(--card-bg);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .job_seen_beacon:hover, .job_seen_beacon.selected {
+      border-color: #3b82f6;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+    }
+
+    .jobTitle { font-size: 18px; color: #60a5fa; margin-bottom: 4px; }
+    .companyName { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+    .jobLocation { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .badge-easily-apply {
+      background: rgba(37, 87, 167, 0.3);
+      color: #93c5fd;
+      border: 1px solid #2557a7;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .job-description-box {
+      background: rgba(0, 0, 0, 0.25);
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      margin-bottom: 16px;
+    }
+
+    .apply-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .apply-btn:hover { background: var(--primary-hover); }
+
+    /* Right View: Inspector & Hardware Click Telemetry */
+    .telemetry-view {
+      width: 380px;
+      background: #090d16;
+      border-left: 1px solid var(--border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .telemetry-header h2 { font-size: 15px; color: #fff; }
+    .telemetry-header p { font-size: 12px; color: var(--text-muted); }
+
+    .telemetry-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 12px;
+    }
+    .telemetry-card h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+
+    .click-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .badge-trusted {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      border: 1px solid var(--success);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .badge-untrusted {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .sentinel-tools {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tool-btn {
+      background: #334155;
+      color: #fff;
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .tool-btn:hover { background: #475569; }
+
+    /* Modal Overlay (SmartApply Wizard) */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal-window {
+      background: #111827;
+      border: 1px solid #374151;
+      width: 580px;
+      max-height: 85vh;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1f2937;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 { font-size: 16px; font-weight: 700; color: #fff; }
+    .step-indicator { font-size: 12px; color: var(--text-muted); }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #1f2937;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      background: #0b0f19;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e5e7eb;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    .radio-card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .radio-card input { accent-color: #3b82f6; width: 18px; height: 18px; }
+
+    .btn-wizard {
+      background: #2557a7;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-wizard:hover { background: #1c3f7a; }
+
+    .cloudflare-sim {
+      border: 2px dashed #f97316;
+      background: rgba(249, 115, 22, 0.1);
+      padding: 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #f97316;
+      font-weight: 600;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Search Results Page Simulation -->
+  <div class="indeed-view">
+    <div class="search-header">
+      <h1>Indeed Job Search Simulator</h1>
+      <p>Simulating: Full Stack Software Engineer - Remote (React, TypeScript, Python)</p>
+    </div>
+
+    <!-- Mock Job Cards for Salary Testing -->
+    <div class="job_seen_beacon" data-jk="mock-jk-101" data-salary="₱12,000 - ₱15,000 a month" data-title="Junior Web Assistant (Below Range)" data-company="Startup Alpha" data-desc="Entry-level assistant role. Looking for HTML/CSS basics. Salary: ₱12,000 - ₱15,000 a month.">
+      <h2 class="jobTitle">Junior Web Assistant</h2>
+      <div class="companyName" data-testid="company-name">Startup Alpha</div>
+      <div class="jobLocation">Manila / Remote</div>
+      <div class="badge-row">
+        <span class="badge-easily-apply" data-testid="indeedApply">⚡ Easily apply</span>
+        <span class="salary-snippet-container" style="font-size: 12px; color: #f59e0b;">₱12,000 - ₱15,000 a month</span>
+      </div>
+    </div>
+
+    <div class="job_seen_beacon selected" data-jk="mock-jk-102" data-salary="₱25,000 - ₱30,000 a month" data-company="Acme Tech Labs" data-desc="We are hiring a Frontend React Developer. Requirements: 2+ years React, TypeScript. Looking for passionate problem solvers. Salary: ₱25,000 - ₱30,000 a month.">
+      <h2 class="jobTitle">Frontend React Developer</h2>
+      <div class="companyName" data-testid="company-name">Acme Tech Labs</div>
+      <div class="jobLocation">Remote (Philippines / Global)</div>
+      <div class="badge-row">
+        <span class="badge-easily-apply" data-testid="indeedApply">⚡ Easily apply</span>
+        <span class="salary-snippet-container" style="font-size: 12px; color: #10b981;">₱25,000 - ₱30,000 a month</span>
+      </div>
+    </div>
+
+    <div class="job_seen_beacon" data-jk="mock-jk-103" data-salary="₱75,000 - ₱95,000 a month" data-company="Enterprise Systems Corp" data-desc="Leading large distributed systems. Requirements: 8+ years experience, Kubernetes, Go. Salary: ₱75,000 - ₱95,000 a month.">
+      <h2 class="jobTitle">Staff Infrastructure Lead</h2>
+      <div class="companyName" data-testid="company-name">Enterprise Systems Corp</div>
+      <div class="jobLocation">Remote</div>
+      <div class="badge-row">
+        <span class="badge-easily-apply" data-testid="indeedApply">⚡ Easily apply</span>
+        <span class="salary-snippet-container" style="font-size: 12px; color: #8b5cf6;">₱75,000 - ₱95,000 a month</span>
+      </div>
+    </div>
+
+    <!-- Active Job Detail Box -->
+    <div id="jobDetailContainer" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px;">
+      <h2 id="detailJobTitle" style="font-size: 18px; color: #60a5fa; margin-bottom: 4px;">Frontend React Developer</h2>
+      <div id="detailCompany" style="font-size: 14px; font-weight: 600; color: #e2e8f0; margin-bottom: 6px;">Acme Tech Labs</div>
+      <div id="salaryInfoAndJobType" style="font-size: 13px; color: #38bdf8; margin-bottom: 12px;">₱25,000 - ₱30,000 a month - Full-time</div>
+
+      <div class="job-description-box" id="jobDescriptionText">
+        <p><strong>About Acme Tech Labs:</strong> We build next-generation distributed systems and web apps.</p>
+        <p style="margin-top: 6px;"><strong>Requirements:</strong> 2+ years experience with React, TypeScript, and SQL. Looking for passionate problem solvers.</p>
+      </div>
+
+      <button id="indeedApplyButton" class="apply-btn" data-testid="indeedApply">
+        Apply now
+      </button>
+    </div>
+  </div>
+
+  <!-- Telemetry Inspector Panel -->
+  <div class="telemetry-view">
+    <div class="telemetry-header">
+      <h2>Hardware Click Telemetry</h2>
+      <p>Verifies CDP physical event injection and React setter interception.</p>
+    </div>
+
+    <div class="telemetry-card">
+      <h3>Last Click Status</h3>
+      <div id="lastClickResult" class="click-status">
+        <span class="badge-trusted">Waiting for click...</span>
+      </div>
+      <div style="margin-top: 8px; color: var(--text-muted); font-size: 11px;">
+        <div>Coordinates: <span id="clickCoords">-</span></div>
+        <div>Target Element: <span id="clickTarget">-</span></div>
+        <div>isTrusted: <span id="clickTrusted">-</span></div>
+      </div>
+    </div>
+
+    <div class="telemetry-card">
+      <h3>React Controlled Inputs</h3>
+      <div style="font-size: 11px; color: #cbd5e1; line-height: 1.4;">
+        Native prototype setters and synthetic bubble dispatches are verified on this form.
+      </div>
+    </div>
+
+    <div class="telemetry-card">
+      <h3>Sentinel Simulation Tools</h3>
+      <div class="sentinel-tools">
+        <button id="btnInjectCloudflare" class="tool-btn">🚨 Inject Cloudflare Turnstile</button>
+        <button id="btnInjectError" class="tool-btn">⚠️ Inject Form Error Banner</button>
+        <button id="btnResetWizard" class="tool-btn">🔄 Reset Wizard to Step 1</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SmartApply Multi-Step Modal Simulation -->
+  <div id="smartApplyModal" class="modal-backdrop">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h2 id="modalStepTitle">Contact information</h2>
+        <span id="modalStepCount" class="step-indicator">Step 1 of 4</span>
+      </div>
+
+      <div class="modal-body" id="modalStepContent">
+        <!-- Dynamic Step Content rendered here -->
+      </div>
+
+      <div class="modal-footer" id="modalFooter">
+        <button id="btnWizardBack" class="tool-btn" style="display: none;">Back</button>
+        <button id="btnWizardContinue" class="btn-wizard">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global Click Listener for Telemetry
+    document.addEventListener('click', (e) => {
+      const isTrusted = e.isTrusted;
+      const targetTag = e.target.tagName.toLowerCase();
+      const targetText = (e.target.innerText || e.target.value || '').substring(0, 20);
+
+      document.getElementById('clickCoords').textContent = `X: ${e.clientX}, Y: ${e.clientY}`;
+      document.getElementById('clickTarget').textContent = `<${targetTag}> "${targetText}"`;
+      document.getElementById('clickTrusted').textContent = isTrusted ? 'true (CDP Physical)' : 'false (Synthetic element.click)';
+
+      const resultBox = document.getElementById('lastClickResult');
+      if (isTrusted) {
+        resultBox.innerHTML = `<span class="badge-trusted">✓ Trusted Hardware Click (isTrusted: true)</span>`;
+      } else {
+        resultBox.innerHTML = `<span class="badge-untrusted">⚠ Untrusted Synthetic Event (isTrusted: false)</span>`;
+      }
+    }, true);
+
+    // Multi-Step Wizard State
+    let currentStep = 1;
+    const modal = document.getElementById('smartApplyModal');
+    const modalTitle = document.getElementById('modalStepTitle');
+    const modalStepCount = document.getElementById('modalStepCount');
+    const modalContent = document.getElementById('modalStepContent');
+    const btnContinue = document.getElementById('btnWizardContinue');
+    const btnBack = document.getElementById('btnWizardBack');
+
+    // Switch Active Mock Card
+    document.querySelectorAll('.job_seen_beacon').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.job_seen_beacon').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+
+        const title = card.getAttribute('data-title') || card.querySelector('.jobTitle').innerText;
+        const company = card.getAttribute('data-company') || card.querySelector('.companyName').innerText;
+        const salary = card.getAttribute('data-salary') || '';
+        const desc = card.getAttribute('data-desc') || '';
+
+        document.getElementById('detailJobTitle').textContent = title;
+        document.getElementById('detailCompany').textContent = company;
+        document.getElementById('salaryInfoAndJobType').textContent = `${salary} - Full-time`;
+        document.getElementById('jobDescriptionText').innerHTML = `<p>${desc}</p>`;
+      });
+    });
+
+    // Open Modal when "Apply now" is clicked
+    document.getElementById('indeedApplyButton').addEventListener('click', () => {
+      currentStep = 1;
+      renderStep(currentStep);
+      modal.classList.add('open');
+    });
+
+    // Step Renderer
+    function renderStep(step) {
+      modalContent.innerHTML = '';
+      btnBack.style.display = step > 1 ? 'block' : 'none';
+
+      switch(step) {
+        case 1: // Contact Info
+          modalTitle.textContent = 'Contact information';
+          modalStepCount.textContent = 'Step 1 of 4';
+          btnContinue.textContent = 'Continue';
+          modalContent.innerHTML = `
+            <div class="form-group">
+              <label for="firstName">First name *</label>
+              <input type="text" id="firstName" name="firstName" required>
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last name *</label>
+              <input type="text" id="lastName" name="lastName" required>
+            </div>
+            <div class="form-group">
+              <label for="email">Email address *</label>
+              <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+              <label for="phoneNumber">Phone number *</label>
+              <input type="tel" id="phoneNumber" name="phoneNumber" required>
+            </div>
+            <div class="form-group">
+              <label for="location">Location (City, State) *</label>
+              <input type="text" id="location" name="location" required>
+            </div>
+          `;
+          break;
+
+        case 2: // Resume Select
+          modalTitle.textContent = 'Select a resume';
+          modalStepCount.textContent = 'Step 2 of 4';
+          btnContinue.textContent = 'Continue';
+          modalContent.innerHTML = `
+            <label class="radio-card">
+              <input type="radio" name="resumeSelect" value="indeed-saved" checked>
+              <div>
+                <strong>Primary Indeed Resume</strong>
+                <p style="font-size: 12px; color: var(--text-muted);">Updated recently • PDF</p>
+              </div>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="resumeSelect" value="upload-new">
+              <div>
+                <strong>Upload a different resume</strong>
+                <p style="font-size: 12px; color: var(--text-muted);">PDF, DOCX (Max 5MB)</p>
+              </div>
+            </label>
+          `;
+          break;
+
+        case 3: // Screening Questions
+          modalTitle.textContent = 'Questions from the employer';
+          modalStepCount.textContent = 'Step 3 of 4';
+          btnContinue.textContent = 'Continue to review';
+          modalContent.innerHTML = `
+            <div class="form-group ia-Questions-item" data-testid="question-react">
+              <label for="expReact">How many years of React experience do you have? *</label>
+              <input type="number" id="expReact" min="0" max="40" required>
+            </div>
+            <div class="form-group ia-Questions-item" data-testid="question-python">
+              <label for="expPython">How many years of Python experience do you have? *</label>
+              <input type="number" id="expPython" min="0" max="40" required>
+            </div>
+            <div class="form-group ia-Questions-item" data-testid="question-auth">
+              <label>Are you legally authorized to work in the United States? *</label>
+              <div style="display: flex; gap: 16px; margin-top: 4px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="radio" name="workAuth" value="yes"> Yes
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <input type="radio" name="workAuth" value="no"> No
+                </label>
+              </div>
+            </div>
+            <div class="form-group ia-Questions-item" data-testid="question-education">
+              <label for="educationSelect">Highest level of completed education *</label>
+              <select id="educationSelect">
+                <option value="">Select an option</option>
+                <option value="High School">High School</option>
+                <option value="Bachelor's Degree">Bachelor's Degree</option>
+                <option value="Master's Degree">Master's Degree</option>
+                <option value="Doctorate">Doctorate</option>
+              </select>
+            </div>
+            <div class="form-group ia-Questions-item" data-testid="question-salary">
+              <label for="salaryQuestion">What is your expected salary and start date?</label>
+              <textarea id="salaryQuestion" rows="2" placeholder="e.g. $70,000 / Available in 2 weeks"></textarea>
+            </div>
+          `;
+          break;
+
+        case 4: // Review
+          modalTitle.textContent = 'Review your application';
+          modalStepCount.textContent = 'Step 4 of 4';
+          btnContinue.textContent = 'Submit your application';
+          btnContinue.setAttribute('data-testid', 'submit-application');
+          modalContent.innerHTML = `
+            <div data-testid="review-page">
+              <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 8px; font-size: 13px; line-height: 1.6;">
+                <p><strong>Job:</strong> Senior Full Stack Engineer</p>
+                <p><strong>Company:</strong> Acme Cloud Solutions</p>
+                <p><strong>Resume:</strong> Primary Indeed Resume (Saved)</p>
+                <p><strong>Contact:</strong> candidate@example.com</p>
+              </div>
+              <p style="margin-top: 14px; font-size: 12px; color: var(--text-muted);">
+                By clicking "Submit your application", you agree that your profile details will be submitted to Acme Cloud Solutions.
+              </p>
+            </div>
+          `;
+          break;
+
+        case 5: // Success
+          modalTitle.textContent = 'Application submitted';
+          modalStepCount.textContent = 'Complete';
+          btnContinue.textContent = 'Close';
+          btnBack.style.display = 'none';
+          modalContent.innerHTML = `
+            <div data-testid="application-submitted" style="text-align: center; padding: 20px;">
+              <div style="font-size: 40px; margin-bottom: 12px;">🎉</div>
+              <h3 style="font-size: 18px; color: var(--success); margin-bottom: 8px;">Your application has been submitted!</h3>
+              <p style="font-size: 13px; color: var(--text-muted);">You will receive a confirmation email from Indeed.</p>
+            </div>
+          `;
+          break;
+      }
+    }
+
+    btnContinue.addEventListener('click', () => {
+      if (currentStep < 5) {
+        currentStep++;
+        renderStep(currentStep);
+      } else {
+        modal.classList.remove('open');
+      }
+    });
+
+    btnBack.addEventListener('click', () => {
+      if (currentStep > 1) {
+        currentStep--;
+        renderStep(currentStep);
+      }
+    });
+
+    // Sentinel Simulator Buttons
+    document.getElementById('btnInjectCloudflare').addEventListener('click', () => {
+      const challenge = document.createElement('div');
+      challenge.id = 'challenge-running';
+      challenge.className = 'cloudflare-sim';
+      challenge.innerHTML = `
+        <iframe src="https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2" style="width: 100%; height: 65px; border: none;"></iframe>
+      `;
+      modalContent.prepend(challenge);
+    });
+
+    document.getElementById('btnInjectError').addEventListener('click', () => {
+      const error = document.createElement('div');
+      error.setAttribute('role', 'alert');
+      error.className = 'ia-BasePage-error';
+      error.style.background = 'rgba(239, 68, 68, 0.2)';
+      error.style.border = '1px solid #ef4444';
+      error.style.color = '#f87171';
+      error.style.padding = '10px 14px';
+      error.style.borderRadius = '6px';
+      error.style.fontSize = '12px';
+      error.style.fontWeight = '600';
+      error.textContent = 'Please answer all required questions before continuing.';
+      modalContent.prepend(error);
+    });
+
+    document.getElementById('btnResetWizard').addEventListener('click', () => {
+      currentStep = 1;
+      renderStep(currentStep);
+      modal.classList.add('open');
+    });
+  </script>
+</body>
+</html>

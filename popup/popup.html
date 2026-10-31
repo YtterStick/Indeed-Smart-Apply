@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indeed Stealth Automation</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <div class="brand-title">Indeed Stealth</div>
+          <span class="brand-version">PRO v1.0.3</span>
+        </div>
+      </div>
+      <div id="statusBadge" class="status-badge status-idle">
+        <span class="status-dot"></span>
+        <span class="status-text">IDLE</span>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <span class="metric-label">Applications Today</span>
+        <span id="statToday" class="metric-val">0 / 25</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Session Total</span>
+        <span id="statSession" class="metric-val">0</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Pacing Cooldown</span>
+        <span id="statCooldown" class="metric-val">Ready</span>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-segmented">
+      <button class="nav-item active" data-tab="tab-controls">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Controls
+      </button>
+      <button class="nav-item" data-tab="tab-profile">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Profile
+      </button>
+      <button class="nav-item" data-tab="tab-filters">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+        Filters
+      </button>
+      <button class="nav-item" data-tab="tab-settings">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+        Settings
+      </button>
+    </nav>
+
+    <!-- Tab 1: Controls -->
+    <section id="tab-controls" class="tab-content active">
+      <!-- Search Setup -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            Job Search Query
+          </div>
+          <span class="panel-sub">Active tab navigation</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="searchWhat">Job Title or Keyword</label>
+            <input type="text" id="searchWhat" placeholder="e.g. Software Engineer, Customer Support, Analyst">
+          </div>
+          <div class="field">
+            <label for="searchWhere">Location / Remote</label>
+            <input type="text" id="searchWhere" placeholder="e.g. Remote, United States, London, or City">
+          </div>
+        </div>
+        <button type="button" id="btnSearchIndeed" class="btn btn-secondary btn-block">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          Navigate to Indeed Search
+        </button>
+      </div>
+
+      <!-- Execution Panel -->
+      <div class="panel">
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="safeModeCheck">
+            <span class="slider"></span>
+          </label>
+          <div class="toggle-desc">
+            <span class="toggle-title">Safe-Stop Mode (Review Screen Pause)</span>
+            <span class="toggle-detail">Pauses before final submission for human verification</span>
+          </div>
+        </div>
+
+        <div id="filterStatusPill" class="filter-pill">
+          <span class="pill-dot"></span>
+          <span id="filterStatusText">Filters: OFF (Applying to all jobs)</span>
+        </div>
+
+        <div class="action-buttons">
+          <button id="btnStart" class="btn btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Start Auto-Apply
+          </button>
+          <button id="btnPause" class="btn btn-secondary" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            Pause
+          </button>
+          <button id="btnStop" class="btn btn-outline-danger" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>
+            Stop
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Activity Telemetry -->
+      <div class="panel log-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            Activity Stream
+          </div>
+          <button id="btnClearLogs" class="btn-text">Clear Log</button>
+        </div>
+        <div id="logStream" class="log-stream">
+          <!-- Live events streamed here -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 2: Profile & Q&A Dictionary -->
+    <section id="tab-profile" class="tab-content">
+      <form id="profileForm" class="stack-form">
+        <div class="panel">
+          <div class="panel-title mb-10">Candidate Identity</div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="profFullName">Full Name</label>
+              <input type="text" id="profFullName" placeholder="e.g. Jane Doe" required>
+            </div>
+            <div class="field">
+              <label for="profEmail">Email Address</label>
+              <input type="email" id="profEmail" placeholder="e.g. jane.doe@example.com" required>
+            </div>
+            <div class="field">
+              <label for="profPhone">Phone Number</label>
+              <input type="tel" id="profPhone" placeholder="e.g. +1 (555) 012-3456" required>
+            </div>
+            <div class="field">
+              <label for="profLocation">Location</label>
+              <input type="text" id="profLocation" placeholder="e.g. Remote, New York, London">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title mb-10">Compensation & Preferences</div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="profSalaryAmount">Target Salary</label>
+              <input type="number" id="profSalaryAmount" placeholder="e.g. 70000">
+            </div>
+            <div class="field">
+              <label for="profSalaryCurrency">Currency</label>
+              <select id="profSalaryCurrency">
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="CAD">CAD ($)</option>
+                <option value="AUD">AUD ($)</option>
+                <option value="PHP">PHP (₱)</option>
+                <option value="SGD">SGD ($)</option>
+                <option value="INR">INR (₹)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="profSalaryPeriod">Frequency</label>
+              <select id="profSalaryPeriod">
+                <option value="Annual">Annual / Yearly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Hourly">Hourly</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="profNoticePeriod">Notice Period</label>
+              <input type="text" id="profNoticePeriod" placeholder="e.g. Immediately, 2 weeks, or 1 month">
+            </div>
+          </div>
+
+          <div class="checkbox-list">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkWorkAuth" checked>
+              <span class="box"></span>
+              <span>Legally authorized to work</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkSponsorship">
+              <span class="box"></span>
+              <span>Requires visa sponsorship</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkRelocate">
+              <span class="box"></span>
+              <span>Willing to relocate</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkNightShift">
+              <span class="box"></span>
+              <span>Willing to work night / rotating shifts</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkDriverLicense" checked>
+              <span class="box"></span>
+              <span>Valid driver's license</span>
+            </label>
+            <label class="custom-checkbox">
+              <input type="checkbox" id="checkBackgroundCheck" checked>
+              <span class="box"></span>
+              <span>Consent to background check</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title mb-6">Experience by Skill (JSON)</div>
+          <p class="field-desc">Maps skill keywords to years of experience for numeric screening questions.</p>
+          <textarea id="profSkillsJson" rows="3" class="code-field" placeholder='{"javascript": 5, "react": 4, "python": 3}'></textarea>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title mb-6">Custom Screening Q&A Dictionary (JSON)</div>
+          <p class="field-desc">Keyword-to-answer dictionary for specific employer questions.</p>
+          <textarea id="profCustomAnswersJson" rows="3" class="code-field" placeholder='{"highest level of education": "Bachelor&#39;s Degree", "authorized to work": "Yes", "driver license": "Yes"}'></textarea>
+        </div>
+
+        <div class="form-footer">
+          <button type="button" id="btnSaveProfile" class="btn btn-primary">Save Profile</button>
+          <span id="profileSavedNotice" class="save-status">Saved</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tab 3: Filters -->
+    <section id="tab-filters" class="tab-content">
+      <!-- Master Toggle -->
+      <div class="panel">
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="checkFiltersEnabled">
+            <span class="slider"></span>
+          </label>
+          <div class="toggle-desc">
+            <span class="toggle-title">Enable Keyword & Salary Filters</span>
+            <span class="toggle-detail">When disabled, applies to all jobs unconditionally</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Salary Filter -->
+      <div class="panel">
+        <div class="panel-title mb-6">Salary Filter</div>
+        <p class="field-desc">Apply only to postings within your target salary range.</p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="filterSalaryMin">Minimum Salary</label>
+            <input type="number" id="filterSalaryMin" placeholder="e.g. 40000" min="0">
+          </div>
+          <div class="field">
+            <label for="filterSalaryMax">Maximum Salary</label>
+            <input type="number" id="filterSalaryMax" placeholder="e.g. 100000" min="0">
+          </div>
+          <div class="field">
+            <label for="filterSalaryPeriod">Pay Frequency</label>
+            <select id="filterSalaryPeriod">
+              <option value="any">Auto-detect from job</option>
+              <option value="year">Per Year (Annual)</option>
+              <option value="month">Per Month (Monthly)</option>
+              <option value="hour">Per Hour</option>
+            </select>
+          </div>
+          <div class="field" style="justify-content: flex-end;">
+            <label class="custom-checkbox" style="margin-top: 14px;">
+              <input type="checkbox" id="checkRequireSalary">
+              <span class="box"></span>
+              <span>Require listed salary</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blacklist Keywords -->
+      <div class="panel">
+        <div class="panel-title mb-6">Blacklist Keywords</div>
+        <p class="field-desc">Skip jobs containing any of these keywords in title or description (comma separated).</p>
+        <textarea id="filterBlacklist" rows="3" class="text-field" placeholder="commission only, unpaid, internship, security clearance"></textarea>
+      </div>
+
+      <!-- Must-Have Keywords -->
+      <div class="panel">
+        <div class="panel-title mb-6">Must-Have Keywords (Optional)</div>
+        <p class="field-desc">Only apply if at least one keyword appears in the description (comma separated).</p>
+        <textarea id="filterMustHave" rows="2" class="text-field" placeholder="remote, full-time, react, python (optional - leave blank to allow any)"></textarea>
+      </div>
+
+      <div class="form-footer">
+        <button id="btnSaveFilters" class="btn btn-primary">Save Filters</button>
+        <button type="button" id="btnClearFilters" class="btn btn-secondary">Reset Filters</button>
+        <span id="filtersSavedNotice" class="save-status">Saved</span>
+      </div>
+    </section>
+
+    <!-- Tab 4: Settings -->
+    <section id="tab-settings" class="tab-content">
+      <div class="panel">
+        <div class="panel-title mb-10">Application Velocity & Rate Limits</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="settingDailyCap">Daily Application Cap</label>
+            <input type="number" id="settingDailyCap" value="25" min="1" max="100">
+            <span class="field-help">Prevents account rate limiting</span>
+          </div>
+          <div class="field">
+            <label>Pacing Cooldown</label>
+            <div class="readonly-pill">8 - 12 min pause every 6 jobs</div>
+            <span class="field-help">Automatically enforced</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title mb-6">AI Screening Assistant</div>
+        <p class="field-desc">Optional: Provide a Google Gemini API Key to resolve unanticipated free-text employer screening questions automatically.</p>
+        <div class="field">
+          <label for="settingGeminiKey">Google Gemini API Key (Optional)</label>
+          <input type="password" id="settingGeminiKey" placeholder="Paste your Gemini API key (e.g. AIzaSy...)">
+          <span class="field-help">Key is stored strictly locally in your browser</span>
+        </div>
+      </div>
+
+      <div class="form-footer">
+        <button id="btnSaveSettings" class="btn btn-primary">Save Settings</button>
+        <span id="settingsSavedNotice" class="save-status">Saved</span>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
