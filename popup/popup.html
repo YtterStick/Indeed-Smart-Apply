@@ -77,11 +77,11 @@
         <div class="form-grid">
           <div class="field">
             <label for="searchWhat">Job Title or Keyword</label>
-            <input type="text" id="searchWhat" placeholder="e.g. Software Engineer, Customer Support, Analyst">
+            <input type="text" id="searchWhat" placeholder="e.g. Android Developer, Kotlin, Mobile Engineer">
           </div>
           <div class="field">
             <label for="searchWhere">Location / Remote</label>
-            <input type="text" id="searchWhere" placeholder="e.g. Remote, United States, London, or City">
+            <input type="text" id="searchWhere" placeholder="e.g. Remote, Manila, Philippines, or Worldwide">
           </div>
         </div>
         <button type="button" id="btnSearchIndeed" class="btn btn-secondary btn-block">
@@ -147,19 +147,19 @@
           <div class="form-grid">
             <div class="field">
               <label for="profFullName">Full Name</label>
-              <input type="text" id="profFullName" placeholder="e.g. Jane Doe" required>
+              <input type="text" id="profFullName" placeholder="e.g. Mark / Full Name" required>
             </div>
             <div class="field">
               <label for="profEmail">Email Address</label>
-              <input type="email" id="profEmail" placeholder="e.g. jane.doe@example.com" required>
+              <input type="email" id="profEmail" placeholder="e.g. mark.dev@example.com" required>
             </div>
             <div class="field">
               <label for="profPhone">Phone Number</label>
-              <input type="tel" id="profPhone" placeholder="e.g. +1 (555) 012-3456" required>
+              <input type="tel" id="profPhone" placeholder="e.g. +63 917 123 4567 or +1 (555) 012-3456" required>
             </div>
             <div class="field">
               <label for="profLocation">Location</label>
-              <input type="text" id="profLocation" placeholder="e.g. Remote, New York, London">
+              <input type="text" id="profLocation" placeholder="e.g. Manila, Philippines or Remote">
             </div>
           </div>
         </div>
@@ -169,17 +169,17 @@
           <div class="form-grid">
             <div class="field">
               <label for="profSalaryAmount">Target Salary</label>
-              <input type="number" id="profSalaryAmount" placeholder="e.g. 70000">
+              <input type="number" id="profSalaryAmount" placeholder="e.g. 80000">
             </div>
             <div class="field">
               <label for="profSalaryCurrency">Currency</label>
               <select id="profSalaryCurrency">
+                <option value="PHP">PHP (₱)</option>
                 <option value="USD">USD ($)</option>
                 <option value="EUR">EUR (€)</option>
                 <option value="GBP">GBP (£)</option>
                 <option value="CAD">CAD ($)</option>
                 <option value="AUD">AUD ($)</option>
-                <option value="PHP">PHP (₱)</option>
                 <option value="SGD">SGD ($)</option>
                 <option value="INR">INR (₹)</option>
               </select>
@@ -187,14 +187,14 @@
             <div class="field">
               <label for="profSalaryPeriod">Frequency</label>
               <select id="profSalaryPeriod">
-                <option value="Annual">Annual / Yearly</option>
                 <option value="Monthly">Monthly</option>
+                <option value="Annual">Annual / Yearly</option>
                 <option value="Hourly">Hourly</option>
               </select>
             </div>
             <div class="field">
               <label for="profNoticePeriod">Notice Period</label>
-              <input type="text" id="profNoticePeriod" placeholder="e.g. Immediately, 2 weeks, or 1 month">
+              <input type="text" id="profNoticePeriod" placeholder="e.g. 2 weeks or Immediately">
             </div>
           </div>
 
@@ -235,13 +235,13 @@
         <div class="panel">
           <div class="panel-title mb-6">Experience by Skill (JSON)</div>
           <p class="field-desc">Maps skill keywords to years of experience for numeric screening questions.</p>
-          <textarea id="profSkillsJson" rows="3" class="code-field" placeholder='{"javascript": 5, "react": 4, "python": 3}'></textarea>
+          <textarea id="profSkillsJson" rows="3" class="code-field" placeholder='{"kotlin": 4, "android": 4, "jetpack compose": 3, "java": 4, "react": 3}'></textarea>
         </div>
 
         <div class="panel">
           <div class="panel-title mb-6">Custom Screening Q&A Dictionary (JSON)</div>
           <p class="field-desc">Keyword-to-answer dictionary for specific employer questions.</p>
-          <textarea id="profCustomAnswersJson" rows="3" class="code-field" placeholder='{"highest level of education": "Bachelor&#39;s Degree", "authorized to work": "Yes", "driver license": "Yes"}'></textarea>
+          <textarea id="profCustomAnswersJson" rows="3" class="code-field" placeholder='{"highest level of education": "Bachelor&#39;s Degree in Computer Science", "authorized to work": "Yes", "notice period": "2 weeks"}'></textarea>
         </div>
 
         <div class="form-footer">
@@ -274,18 +274,18 @@
         <div class="form-grid">
           <div class="field">
             <label for="filterSalaryMin">Minimum Salary</label>
-            <input type="number" id="filterSalaryMin" placeholder="e.g. 40000" min="0">
+            <input type="number" id="filterSalaryMin" placeholder="e.g. 60000" min="0">
           </div>
           <div class="field">
             <label for="filterSalaryMax">Maximum Salary</label>
-            <input type="number" id="filterSalaryMax" placeholder="e.g. 100000" min="0">
+            <input type="number" id="filterSalaryMax" placeholder="e.g. 150000" min="0">
           </div>
           <div class="field">
             <label for="filterSalaryPeriod">Pay Frequency</label>
             <select id="filterSalaryPeriod">
               <option value="any">Auto-detect from job</option>
-              <option value="year">Per Year (Annual)</option>
               <option value="month">Per Month (Monthly)</option>
+              <option value="year">Per Year (Annual)</option>
               <option value="hour">Per Hour</option>
             </select>
           </div>
@@ -303,14 +303,14 @@
       <div class="panel">
         <div class="panel-title mb-6">Blacklist Keywords</div>
         <p class="field-desc">Skip jobs containing any of these keywords in title or description (comma separated).</p>
-        <textarea id="filterBlacklist" rows="3" class="text-field" placeholder="commission only, unpaid, internship, security clearance"></textarea>
+        <textarea id="filterBlacklist" rows="3" class="text-field" placeholder="commission only, unpaid, internship, senior lead"></textarea>
       </div>
 
       <!-- Must-Have Keywords -->
       <div class="panel">
         <div class="panel-title mb-6">Must-Have Keywords (Optional)</div>
         <p class="field-desc">Only apply if at least one keyword appears in the description (comma separated).</p>
-        <textarea id="filterMustHave" rows="2" class="text-field" placeholder="remote, full-time, react, python (optional - leave blank to allow any)"></textarea>
+        <textarea id="filterMustHave" rows="2" class="text-field" placeholder="android, kotlin, remote, mobile (leave blank to allow all)"></textarea>
       </div>
 
       <div class="form-footer">

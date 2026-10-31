@@ -100,9 +100,23 @@ async function initStorage() {
 
 initStorage();
 
-// Track SmartApply tab creation and lifecycle
+// Track SmartApply tab creation and lifecycle with strict duplicate tab prevention
 chrome.tabs.onCreated.addListener((tab) => {
   if (queueState.status === STATE.RUNNING && queueState.searchTabId) {
+    // If an application tab is already active, prevent duplicate tabs from multi-clicks or popup races
+    if (queueState.applicationTabId && queueState.applicationTabId !== tab.id) {
+      setTimeout(async () => {
+        try {
+          const t = await chrome.tabs.get(tab.id);
+          const url = (t.url || t.pendingUrl || '').toLowerCase();
+          if (url.includes('smartapply') || url.includes('indeedapply') || url.includes('indeed.com/apply') || url.includes('indeed.com/viewjob')) {
+            console.log(`[StealthBackground] Prevented duplicate tab: closing extra application tab ${tab.id}`);
+            chrome.tabs.remove(tab.id).catch(() => {});
+          }
+        } catch (_) {}
+      }, 300);
+      return;
+    }
     queueState.applicationTabId = tab.id;
     console.log(`[StealthBackground] Registered application tab: ${tab.id}`);
   }
@@ -434,21 +448,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     // Application link triggered from search tab
+    case 'APPLY_ATTEMPTED':
     case 'APPLY_LINK_TRIGGERED': {
       queueState.currentJobTitle = message.jobTitle || '';
       queueState.currentCompany = message.company || '';
-      // Watchdog fallback: if browser popup blocker prevented new tab, open it explicitly
-      setTimeout(async () => {
-        if (!queueState.applicationTabId && queueState.status === STATE.RUNNING) {
-          try {
-            const newTab = await chrome.tabs.create({ url: message.url, active: true });
-            queueState.applicationTabId = newTab.id;
-            logActivity(`Opened SmartApply tab for "${message.jobTitle}"`, 'info');
-          } catch (e) {
-            console.warn('[StealthBackground] Could not open apply tab:', e);
-          }
-        }
-      }, 1500);
       sendResponse({ success: true });
       break;
     }

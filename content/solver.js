@@ -491,15 +491,12 @@
         isIframe: isIframe,
         iframeOffset: iframeOffset
       });
+    } else {
+      // Fallback single DOM click only if physical coordinates could not be resolved
+      try {
+        continueBtn.click();
+      } catch (_) {}
     }
-
-    // Dual-trigger direct DOM click fallback
-    await Stealth.sleep(250);
-    try {
-      continueBtn.click();
-      const child = continueBtn.querySelector('button, a, span');
-      if (child && child !== continueBtn) child.click();
-    } catch (_) {}
 
     return true;
   }

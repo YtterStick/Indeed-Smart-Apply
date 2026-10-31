@@ -18,6 +18,7 @@
 
   let isScanning = false;
   let isPaused = false;
+  let isApplyingCurrentJob = false;
   let currentJobIndex = 0;
   let candidateProfile = {};
   let filterConfig = {
@@ -34,6 +35,7 @@
     stop() {
       isScanning = false;
       isPaused = false;
+      isApplyingCurrentJob = false;
     }
   };
 
@@ -462,7 +464,7 @@
 
   // Process a single job
   async function processNextJob() {
-    if (!isScanning || isPaused) return;
+    if (!isScanning || isPaused || isApplyingCurrentJob) return;
 
     const cards = getJobCards();
     console.log(`[StealthScanner] Found ${cards.length} cards, processing index ${currentJobIndex}`);
@@ -541,57 +543,42 @@
       return;
     }
 
+    isApplyingCurrentJob = true;
     logToBg(`[APPLY] Initiating SmartApply for: "${jobInfo.title}" at "${jobInfo.company}"`, 'info');
     await Stealth.smoothScrollIntoView(applyButton);
     await Stealth.sleep(Stealth.getRandomInt(350, 700));
 
-    // 1. Dispatch trusted CDP hardware click directly at the button/link
+    // 1. Single physical click dispatch: Prevents multi-click bursts that spawn multiple tabs
     const applyCoords = Stealth.getRandomizedTargetCoordinates(applyButton);
     if (applyCoords) {
       await sendBgMessage({
         type: 'FIRE_TRUSTED_CLICK',
         coords: applyCoords
       });
-    }
-
-    // 2. Synthetic pointer + mouse events and native DOM click
-    await Stealth.sleep(250);
-    try {
-      const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
-      for (const eventName of mouseEvents) {
-        applyButton.dispatchEvent(new MouseEvent(eventName, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          composed: true
-        }));
-      }
-      if (typeof applyButton.click === 'function') {
+    } else {
+      // Fallback: Trigger native click only if physical coordinates were not resolved
+      try {
         applyButton.click();
-      }
-      const child = applyButton.querySelector('button, a, span');
-      if (child && typeof child.click === 'function') {
-        child.click();
-      }
-    } catch (_) {}
-
-    // 3. Register click with background so it can open tab if browser popup blocker prevented it
-    const anchor = applyButton.tagName === 'A' ? applyButton : (applyButton.closest('a') || applyButton.querySelector('a'));
-    if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
-      sendBgMessage({
-        type: 'APPLY_LINK_TRIGGERED',
-        url: anchor.href,
-        jobTitle: jobInfo.title,
-        company: jobInfo.company
-      }).catch(() => {});
+      } catch (_) {}
     }
 
-    // 4. Monitor application progression watchdog (checks for modal in current tab OR application tab in background)
+    // 2. Register active job metadata with background
+    sendBgMessage({
+      type: 'APPLY_ATTEMPTED',
+      jobTitle: jobInfo.title,
+      company: jobInfo.company
+    }).catch(() => {});
+
+    // 3. Monitor application progression watchdog (checks for modal in current tab OR application tab in background)
     logToBg(`[DISPATCH] Clicked "Apply now" for "${jobInfo.title}". Monitoring application wizard...`, 'info');
 
     let applicationActive = false;
     for (let w = 0; w < 16; w++) {
       await Stealth.sleep(500);
+      if (!isScanning || isPaused) {
+        isApplyingCurrentJob = false;
+        return;
+      }
 
       // A. Check for modal/iframe in current tab
       const modal = document.querySelector(
@@ -607,16 +594,20 @@
       const tabCheck = await sendBgMessage({ type: 'CHECK_APPLICATION_TAB' });
       if (tabCheck && tabCheck.hasApplicationTab) {
         applicationActive = true;
-        logToBg(`[TAB] SmartApply opened in new tab. Processing wizard steps...`, 'info');
+        logToBg(`[TAB] SmartApply tab opened. Processing wizard steps...`, 'info');
         break;
       }
     }
 
-    if (!applicationActive) {
-      logToBg(`[WATCHDOG] Apply form did not open for "${jobInfo.title}" (may already be applied or external). Advancing...`, 'warning');
-      await Stealth.sleep(1200);
-      processNextJob();
+    if (applicationActive) {
+      // Lock remains active while user or solver completes this job application
+      return;
     }
+
+    logToBg(`[WATCHDOG] Apply form did not open for "${jobInfo.title}" (may already be applied or external). Advancing...`, 'warning');
+    isApplyingCurrentJob = false;
+    await Stealth.sleep(1200);
+    processNextJob();
   }
 
   // Message router from background
@@ -630,6 +621,7 @@
       case 'START_SCAN': {
         isScanning = true;
         isPaused = false;
+        isApplyingCurrentJob = false;
         currentJobIndex = 0;
         if (message.profile) candidateProfile = message.profile;
         if (message.filters) filterConfig = message.filters;
@@ -643,6 +635,7 @@
 
       case 'NEXT_JOB': {
         console.log('[StealthScanner] Received signal to advance to next job.');
+        isApplyingCurrentJob = false;
         if (isScanning && !isPaused) {
           processNextJob();
         }

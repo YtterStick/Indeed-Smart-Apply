@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       email: '',
       phone: '',
       location: '',
-      salaryExpectation: { amount: '', currency: 'USD', period: 'Annual' },
+      salaryExpectation: { amount: '', currency: 'PHP', period: 'Monthly' },
       noticePeriod: '',
       workAuthorization: true,
       sponsorshipRequired: false,
@@ -136,8 +136,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     profPhone.value = profile.phone || '';
     profLocation.value = profile.location || '';
     profSalaryAmount.value = profile.salaryExpectation?.amount || '';
-    profSalaryCurrency.value = profile.salaryExpectation?.currency || 'USD';
-    profSalaryPeriod.value = profile.salaryExpectation?.period || 'Annual';
+    profSalaryCurrency.value = profile.salaryExpectation?.currency || 'PHP';
+    profSalaryPeriod.value = profile.salaryExpectation?.period || 'Monthly';
     profNoticePeriod.value = profile.noticePeriod || '';
     checkWorkAuth.checked = profile.workAuthorization !== false;
     checkSponsorship.checked = !!profile.sponsorshipRequired;

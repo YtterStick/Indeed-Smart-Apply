@@ -1,8 +1,9 @@
 # Indeed Stealth SmartApply (Manifest V3) 🚀
 
 [![Chrome Manifest V3](https://img.shields.io/badge/Chrome%20Extension-Manifest%20V3-blue.svg)](https://developer.chrome.com/docs/extensions/mv3/intro/)
-[![Stealth Mode](https://img.shields.io/badge/Anti--Detection-CDP%20Hardware%20Clicks-success.svg)](#-key-anti-detection--stealth-features)
-[![AI Powered](https://img.shields.io/badge/AI%20Assistant-Google%20Gemini-orange.svg)](#-ai-screening-assistant-setup-optional)
+[![Anti-Detection](https://img.shields.io/badge/Anti--Detection-CDP%20Hardware%20Clicks-success.svg)](#-key-anti-detection--stealth-features)
+[![Tab Guard](https://img.shields.io/badge/Tab%20Protection-Single--Dispatch%20Locked-brightgreen.svg)](#-single-dispatch--duplicate-tab-protection)
+[![AI Powered](https://img.shields.io/badge/AI%20Assistant-Google%20Gemini-orange.svg)](#step-6-ai-screening-assistant-setup-optional)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 An undetectable, human-paced, automated Chrome Extension engineered to safely search Indeed and complete multi-step **SmartApply / Indeed Apply** wizard applications without triggering Cloudflare Turnstile, DataDome bot checks, or React synthetic input anomalies.
@@ -13,8 +14,9 @@ An undetectable, human-paced, automated Chrome Extension engineered to safely se
 
 - [⚡ Why Indeed Stealth SmartApply?](#-why-indeed-stealth-smartapply)
 - [🛡️ Key Anti-Detection & Stealth Features](#️-key-anti-detection--stealth-features)
+- [🔒 Single-Dispatch & Duplicate Tab Protection](#-single-dispatch--duplicate-tab-protection)
 - [📦 Installation & Setup (5 Minutes)](#-installation--setup-5-minutes)
-- [📘 Complete User Tutorial](#-complete-user-tutorial)
+- [📘 Complete User Tutorial (Android Developer Example)](#-complete-user-tutorial-android-developer-example)
   - [Step 1: Set Up Your Candidate Profile](#step-1-set-up-your-candidate-profile)
   - [Step 2: Configure Skills & Custom Q&A Dictionaries (JSON)](#step-2-configure-skills--custom-qa-dictionaries-json)
   - [Step 3: Define Your Job Search Query](#step-3-define-your-job-search-query)
@@ -24,7 +26,7 @@ An undetectable, human-paced, automated Chrome Extension engineered to safely se
 - [🎯 Running Your First Automation Session](#-running-your-first-automation-session)
 - [🧪 Testing Locally (Without Live Indeed)](#-testing-locally-without-live-indeed)
 - [🔔 Human Sentinel & Audio Chime](#-human-sentinel--audio-chime)
-- [📁 Project Architecture](#-project-architecture)
+- [📁 Project Architecture & Workflow](#-project-architecture--workflow)
 - [💡 Best Practices for Account Safety](#-best-practices-for-account-safety)
 - [❓ Frequently Asked Questions (FAQ)](#-frequently-asked-questions-faq)
 - [📄 Disclaimer & License](#-disclaimer--license)
@@ -33,11 +35,12 @@ An undetectable, human-paced, automated Chrome Extension engineered to safely se
 
 ## ⚡ Why Indeed Stealth SmartApply?
 
-Most job application bots get detected and banned within hours because they use synthetic JavaScript events (`element.click()`, fake keyboard events) and blitz through forms at superhuman speeds. 
+Most job application bots get detected and restricted quickly because they rely on synthetic JavaScript events (`element.click()`, fake keyboard events) and blitz through forms at superhuman speeds, often triggering multiple tabs or popup loops.
 
-**Indeed Stealth SmartApply** was built from the ground up to mimic genuine human hardware interaction:
+**Indeed Stealth SmartApply** was engineered from the ground up to mimic genuine human hardware interaction:
 - **Physical clicks** generated directly by the browser's rendering engine via Chrome DevTools Protocol (`event.isTrusted === true`).
 - **Natural typing jitter** with random per-character delays and prototype-level React 18 setter triggers.
+- **Single-dispatch debouncing** that prevents double-clicks and guarantees exactly one tab/modal per employer.
 - **Organic pacing** with realistic reading delays, inter-application breathers, and automatic coffee breaks.
 - **Safe-Stop Mode** that lets you review every filled form before final submission.
 
@@ -69,6 +72,20 @@ Most job application bots get detected and banned within hours because they use 
 5. **Cloudflare & Screening Question Sentinel:**
    - Automatically handles Cloudflare Turnstile interactive checkboxes where possible.
    - If an unfamiliar mandatory employer question or challenge appears, transitions immediately to `PAUSED_FOR_HUMAN`, highlights the exact question with a pulsating neon-orange glow, plays an audible chime, and waits for you to review and click **Resume**.
+
+---
+
+## 🔒 Single-Dispatch & Duplicate Tab Protection
+
+A common problem with web automation on job platforms is that clicking an "Apply now" button can trigger multi-burst clicks (e.g. physical click + synthetic event + child span click), causing Chrome to open **2 or 3 duplicate tabs for the same employer**.
+
+Indeed Stealth SmartApply features a **Dual-Layer Tab Protection Engine**:
+1. **Single-Dispatch Mutex (`isApplyingCurrentJob`):**
+   - The scanner dispatches a single hardware click to the target button. Secondary synthetic clicks and child element clicks are strictly inhibited.
+   - The scanner locks state until the application is either submitted or closed, preventing re-entrant card clicks.
+2. **Background Tab Deduplicator:**
+   - The background service worker actively intercepts newly created tabs.
+   - If an application tab is already active and another tab attempts to open for the same job URL, the duplicate tab is immediately intercepted and closed.
 
 ---
 
@@ -105,9 +122,9 @@ Most job application bots get detected and banned within hours because they use 
 
 ---
 
-## 📘 Complete User Tutorial
+## 📘 Complete User Tutorial (Android Developer Example)
 
-When you open the extension popup by clicking the icon in your toolbar, you will see a clean dashboard with four navigation tabs: **Controls**, **Profile**, **Filters**, and **Settings**.
+Here is a practical, end-to-end example configured for an **Android / Mobile Developer** based in **Manila, Philippines / Remote**:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -122,69 +139,64 @@ When you open the extension popup by clicking the icon in your toolbar, you will
 
 ### Step 1: Set Up Your Candidate Profile
 
-Before starting any automation, switch to the **Profile** tab to configure your candidate identity. This information will be used to automatically fill contact steps and screening questions.
+Switch to the **Profile** tab:
 
 1. **Candidate Identity:**
-   - **Full Name:** e.g., `Jane Doe`
-   - **Email Address:** e.g., `jane.doe@example.com`
-   - **Phone Number:** e.g., `+1 (555) 012-3456`
-   - **Location:** e.g., `Remote, New York, NY` (or your city/country)
+   - **Full Name:** `Mark / Your Full Name`
+   - **Email Address:** `mark.dev@example.com`
+   - **Phone Number:** `+63 917 123 4567` (or your local contact number)
+   - **Location:** `Manila, Philippines or Remote`
 
 2. **Compensation & Preferences:**
-   - **Target Salary:** Your minimum desired salary amount (e.g., `70000`).
-   - **Currency:** Select your preferred currency (`USD`, `EUR`, `GBP`, `CAD`, `AUD`, `PHP`, `SGD`, `INR`).
-   - **Frequency:** Choose `Annual / Yearly`, `Monthly`, or `Hourly`.
-   - **Notice Period:** e.g., `Immediately`, `2 weeks`, or `1 month`.
+   - **Target Salary:** `80000`
+   - **Currency:** `PHP (₱)` or `USD ($)`
+   - **Frequency:** `Monthly` (for PHP) or `Annual / Yearly` (for USD)
+   - **Notice Period:** `2 weeks` or `Immediately`
 
 3. **Work Authorizations & Disclosures:**
-   - ✅ **Legally authorized to work:** Checked if you have work rights in target location.
-   - ⬜ **Requires visa sponsorship:** Check only if you need visa sponsorship.
-   - ⬜ **Willing to relocate:** Check if open to relocation.
-   - ⬜ **Willing to work night / rotating shifts:** Check if applicable.
-   - ✅ **Valid driver's license:** Check if you hold a driver's license.
-   - ✅ **Consent to background check:** Check if you consent to employer background screening.
+   - ✅ **Legally authorized to work:** Checked
+   - ⬜ **Requires visa sponsorship:** Unchecked (unless applying abroad)
+   - ⬜ **Willing to relocate:** Unchecked (unless open to relocation)
+   - ⬜ **Willing to work night / rotating shifts:** Check if open to US/EU shifts
+   - ✅ **Valid driver's license:** Checked
+   - ✅ **Consent to background check:** Checked
 
-4. Click **"Save Profile"**. A green "Saved" confirmation will appear.
+4. Click **"Save Profile"**.
 
 ---
 
 ### Step 2: Configure Skills & Custom Q&A Dictionaries (JSON)
 
-Employers on Indeed frequently ask screening questions like *"How many years of React experience do you have?"* or *"What is your highest level of education?"*.
-
-The extension uses two flexible JSON dictionaries to answer these questions accurately:
+Screening questions often ask for exact numbers of years or standard interview answers. The extension uses two JSON dictionaries:
 
 #### 1. Experience by Skill (`profSkillsJson`)
-Maps skill keywords to your years of experience. Whenever a numeric screening question mentions one of these keywords, the bot inputs the configured number:
+Maps skill keywords to years of experience. Whenever a numeric screening question mentions one of these keywords, the bot inputs the configured number:
 
 ```json
 {
-  "javascript": 5,
-  "react": 4,
-  "typescript": 3,
-  "node": 4,
-  "python": 3,
-  "sql": 3,
-  "customer support": 2
+  "kotlin": 4,
+  "android": 4,
+  "jetpack compose": 3,
+  "java": 4,
+  "react": 3,
+  "javascript": 4,
+  "git": 4
 }
 ```
 
 #### 2. Custom Screening Q&A Dictionary (`profCustomAnswersJson`)
-Maps keywords found in employer questions to your exact textual answers:
+Maps question keywords to your exact textual answers:
 
 ```json
 {
-  "highest level of education": "Bachelor's Degree",
+  "highest level of education": "Bachelor's Degree in Computer Science",
   "authorized to work": "Yes",
+  "notice period": "2 weeks",
   "driver license": "Yes",
   "gpa": "3.8",
-  "commute": "Yes",
-  "certifications": "AWS Certified Solutions Architect"
+  "commute": "Yes"
 }
 ```
-
-> [!TIP]
-> Both textareas accept standard JSON format. If you make a syntax error (e.g. missing quote or trailing comma), the extension will alert you before saving so your configuration stays valid.
 
 ---
 
@@ -192,40 +204,33 @@ Maps keywords found in employer questions to your exact textual answers:
 
 Go to the **Controls** tab:
 
-1. **Job Title or Keyword:** Enter what you are looking for (e.g., `Software Engineer`, `Frontend Developer`, `Data Analyst`, or `Virtual Assistant`).
-2. **Location / Remote:** Enter your preferred location (e.g., `Remote`, `New York, NY`, `United States`, or `London`).
-3. Click **"Navigate to Indeed Search"**. The active Chrome tab will immediately load Indeed's search results for those parameters.
-
-*(Alternatively, you can manually navigate to any Indeed job search page in Chrome yourself).*
+1. **Job Title or Keyword:** `Android Developer` (or `Kotlin Developer`, `Mobile Engineer`)
+2. **Location / Remote:** `Remote` or `Manila, Philippines`
+3. Click **"Navigate to Indeed Search"**. The active tab will immediately load Indeed search results.
 
 ---
 
 ### Step 4: Smart Salary & Keyword Filtering
 
-Switch to the **Filters** tab. Filtering is **disabled by default**, meaning the bot will apply to all matching Indeed Apply jobs on the page.
-
-To enable intelligent filtering, toggle **"Enable Keyword & Salary Filters"**:
+Switch to the **Filters** tab and toggle **"Enable Keyword & Salary Filters"**:
 
 1. **Salary Filter:**
-   - **Minimum Salary:** e.g., `50000`
-   - **Maximum Salary:** e.g., `120000`
-   - **Pay Frequency:** Choose `Auto-detect`, `Per Year`, `Per Month`, or `Per Hour`.
-   - **Require Listed Salary:** If checked, postings without a visible salary range will be skipped. If unchecked, postings with undisclosed salaries are allowed through.
+   - **Minimum Salary:** `60000`
+   - **Maximum Salary:** `150000`
+   - **Pay Frequency:** `Per Month (Monthly)` (or `Per Year` for USD)
+   - **Require Listed Salary:** Leave unchecked to also allow jobs with undisclosed compensation.
 
 2. **Blacklist Keywords (Skip List):**
-   - Comma-separated words. If any of these appear in the job title or description, the job is skipped:
    ```
-   commission only, unpaid, internship, security clearance, senior lead
+   commission only, unpaid, internship, senior lead, on-site only
    ```
 
 3. **Must-Have Keywords (Optional):**
-   - Comma-separated words. The bot will only apply if at least one of these keywords appears:
    ```
-   remote, react, full-time, python
+   android, kotlin, remote, mobile
    ```
-   *(Leave blank if you want all non-blacklisted jobs).*
 
-4. Click **"Save Filters"**. The status pill on the Controls tab will update to indicate your active filters.
+4. Click **"Save Filters"**.
 
 ---
 
@@ -233,95 +238,100 @@ To enable intelligent filtering, toggle **"Enable Keyword & Salary Filters"**:
 
 Switch to the **Settings** tab:
 
-1. **Daily Application Cap:** Set the maximum number of applications allowed per 24-hour day (default: `25`).
-   - Prevents your account from tripping Indeed's velocity thresholds.
-   - Once reached, the bot automatically stops and displays `DAILY CAP MET`.
-
-2. **Pacing Cooldown:**
-   - Built-in behavioral pacing automatically takes an **8 to 12-minute coffee break** after every 6 applications.
-   - The cooldown countdown is displayed live on the dashboard metrics bar.
+1. **Daily Application Cap:** `25` applications per day (prevents account rate limits).
+2. **Pacing Cooldown:** Built-in automatic **8 to 12-minute coffee break** every 6 applications.
 
 ---
 
 ### Step 6: AI Screening Assistant Setup (Optional)
 
-If an employer asks an open-ended free-text question that is **not** covered in your Custom Q&A Dictionary (e.g., *"Why do you want to work for our company?"* or *"Describe a time you handled a difficult client"*), the bot can automatically consult Google Gemini AI to craft a tailored answer.
-
-1. Get a free API key from [Google AI Studio](https://aistudio.google.com/).
-2. In the **Settings** tab, paste your key into **Google Gemini API Key**.
-3. Click **"Save Settings"**.
-
-> [!NOTE]
-> The API key is stored strictly locally in your browser's `chrome.storage.local`. It is never uploaded to any third-party server or repository.
+For unexpected free-text questions (e.g. *"Describe your experience with MVI / MVVM architecture"*):
+1. Obtain a free API key from [Google AI Studio](https://aistudio.google.com/).
+2. Paste it into **Google Gemini API Key** in the Settings tab and click **Save Settings**.
+3. Keys are stored strictly locally in your browser's private Chrome storage.
 
 ---
 
 ## 🎯 Running Your First Automation Session
 
-### Recommendation: Start in Safe-Stop Mode (Review Mode)
+### Safe-Stop Mode (Review Screen Pause)
 
-For your first run, it is highly recommended to keep **Safe-Stop Mode** enabled (checked on the Controls tab):
+On your first run, keep **Safe-Stop Mode** checked on the Controls tab:
 
-1. **Open Indeed Search:** Ensure your Chrome tab is on an Indeed search page with results.
-2. **Click "Start Auto-Apply (Review Mode)":**
-   - The bot attaches a trusted CDP session and scans the search results for jobs marked with **"Easily apply"** / **"Apply now"**.
-   - It clicks the job card, reads the details, evaluates salary and keyword filters, and clicks **"Apply now"**.
-   - In the SmartApply modal or window, it automatically fills contact info, selects your saved resume, and answers screening questions.
-3. **Safe-Stop Pause:**
-   - When the application reaches the final **"Review your application"** screen, the bot safely **pauses**.
-   - You can inspect all filled fields with your own eyes!
-   - Click the submit button yourself or click **Resume** in the popup to continue.
-4. **Switch to Full Auto-Apply:**
-   - Once you are confident with how the bot answers your screening questions, uncheck **Safe-Stop Mode**.
-   - The button will update to **"Start Full Auto-Apply"**. The bot will now autonomously review and submit applications.
+1. Navigate to Indeed and verify search results are showing.
+2. Click **"Start Auto-Apply (Review Mode)"**.
+3. The bot will:
+   - Perform a single trusted CDP hardware click on the job card.
+   - Evaluate salary and keywords.
+   - Click "Apply now" once without opening duplicate tabs.
+   - Fill candidate contact details with human typing jitter.
+   - Select your saved Indeed resume.
+   - Fill screening questions.
+   - **Pause at the Review screen** and play a chime.
+4. Verify all information on screen. You can submit manually, or uncheck Safe-Stop Mode to let the bot auto-submit subsequent applications!
 
 ---
 
 ## 🧪 Testing Locally (Without Live Indeed)
 
-Want to see the bot in action without risking live job submissions? Use the built-in local simulator!
+Before running on live job sites, test all interactions locally using the built-in simulator:
 
-1. In the extension popup, go to **Settings** and click **"🧪 Open Mock Indeed Wizard"** (or open [`test/mock-indeed-wizard.html`](test/mock-indeed-wizard.html) in Chrome).
-2. The mock simulator displays a simulated Indeed job search page with interactive job cards and a realistic 4-step SmartApply wizard.
-3. Click **"Start Auto-Apply"** in the popup:
-   - Watch the bot perform CDP physical clicks on the simulated job card.
-   - Observe human typing jitter in the contact inputs.
-   - Watch the wizard advance through Resume selection, Screening questions, and Review.
-4. Test Sentinel alerts using the test buttons in the mock page:
-   - **"🚨 Inject Cloudflare Turnstile"**: Simulates a Cloudflare challenge and tests bypass/pause.
-   - **"⚠️ Inject Form Error Banner"**: Tests immediate sentinel pause, neon highlight, and audible chime.
+1. Open [`test/mock-indeed-wizard.html`](test/mock-indeed-wizard.html) in Chrome.
+2. Open the extension popup and click **"Start Auto-Apply"**.
+3. Watch the hardware click telemetry panel verify:
+   - `isTrusted: true (CDP Physical)`
+   - Contact form auto-fill with typing jitter
+   - Resume selection
+   - Screening questions answered
+   - Safe-Stop mode paused at the final Review screen
+4. Test Sentinel triggers using **"🚨 Inject Cloudflare Turnstile"** or **"⚠️ Inject Form Error Banner"** to observe immediate pause, orange highlight, and audible chime.
 
 ---
 
 ## 🔔 Human Sentinel & Audio Chime
 
-The bot is designed to **never blindly guess** or make catastrophic mistakes.
-
 When the bot encounters:
 - An unanswered mandatory question
 - A CAPTCHA or verification challenge
-- A validation error banner on the form
+- A form validation error
 
 It will:
-1. Immediately halt queue execution (`PAUSED_FOR_HUMAN`).
-2. Highlight the problematic element with a pulsating neon-orange glow.
-3. Play a chime via the Web Audio API to alert you.
-4. Send a Chrome desktop notification.
+1. Immediately pause (`PAUSED_FOR_HUMAN`).
+2. Highlight the element with a pulsating neon-orange glow.
+3. Play an alert chime via the Web Audio API.
+4. Send a desktop notification.
 
-You can simply resolve the question in the tab, then click **Resume** in the popup to keep going!
+Simply complete the highlighted question in your tab, then click **Resume** in the popup to continue.
 
 ---
 
-## 📁 Project Architecture
+## 📁 Project Architecture & Workflow
 
+```mermaid
+graph TD
+    A[Indeed Job Search Page] -->|CDP Hardware Click| B(Card Selected)
+    B -->|Keyword & Salary Filter| C{Job Matches Filters?}
+    C -->|No| D[Log & Advance to Next Card]
+    C -->|Yes| E[Single-Dispatch Apply Click]
+    E -->|Modal or Single Tab| F[SmartApply Solver]
+    F --> G[Fill Contact & Type Jitter]
+    G --> H[Select Saved Resume]
+    H --> I[Answer Questions via Dictionaries]
+    I --> J{Safe-Stop Mode?}
+    J -->|Yes| K[Pause on Review Screen & Chime]
+    J -->|No| L[Submit Application]
+    L --> M[Pacing Cooldown & Coffee Break]
+```
+
+### File Structure
 ```
 indeed-automation/
 ├── manifest.json              # Chrome MV3 manifest (permissions, content scripts, metadata)
-├── background.js              # Service Worker (CDP hardware clicks, queue state machine, Gemini AI)
+├── background.js              # Service Worker (CDP hardware clicks, tab deduplication, Gemini AI)
 ├── utils/
 │   └── dom-stealth.js         # React 18 setter bypass, typing simulation, resilient selectors, chime
 ├── content/
-│   ├── scanner.js             # Top-frame search scanner, job filtering, "Apply now" trigger
+│   ├── scanner.js             # Top-frame search scanner, single-click apply, job filtering
 │   └── solver.js              # SmartApply wizard solver, step detection, sentinel triggers
 ├── popup/
 │   ├── popup.html             # Cyber-sleek dark dashboard UI with glassmorphism tabs
@@ -346,17 +356,17 @@ indeed-automation/
 
 ## ❓ Frequently Asked Questions (FAQ)
 
-#### Q: Does this work on international Indeed domains?
-**A:** Yes! The extension matches `*://*.indeed.com/*` and supports local country subdomains (e.g. `ca.indeed.com`, `uk.indeed.com`, `ph.indeed.com`, etc.). It also normalizes salary amounts across multiple currencies ($ USD, € EUR, £ GBP, ₱ PHP, CAD, AUD, SGD, INR).
+#### Q: Why was it opening 3 tabs before, and how is it fixed?
+**A:** Previously, the apply trigger was firing multiple clicks in rapid succession (CDP click + synthetic events + child span click + background watchdog timer). This has been completely replaced with a **Single-Dispatch Mutex** in `scanner.js` and an active **Tab Deduplicator** in `background.js` that intercepts and closes any duplicate tabs.
 
-#### Q: What if Indeed asks to upload a new resume file?
-**A:** If you have at least one resume saved in your Indeed account, Indeed provides a radio button to select your saved resume, which the bot automatically selects. If an employer explicitly demands a fresh file upload, the Sentinel will pause and notify you to choose your file.
+#### Q: Does this work on international Indeed domains?
+**A:** Yes! The extension matches `*://*.indeed.com/*` and supports local country subdomains (e.g. `ph.indeed.com`, `ca.indeed.com`, `uk.indeed.com`, etc.). It also normalizes salary amounts across multiple currencies ($ USD, ₱ PHP, € EUR, £ GBP, CAD, AUD, SGD, INR).
+
+#### Q: What if an employer asks for a fresh resume upload?
+**A:** If you have a resume saved on your Indeed account, Indeed provides a radio button to select your saved resume, which the bot automatically selects. If an employer explicitly demands a fresh file upload, the Sentinel will pause and notify you to choose your file.
 
 #### Q: Where are my profile and settings stored?
 **A:** Everything is saved directly in your browser using Chrome's local storage API (`chrome.storage.local`). Your personal details, credentials, and API keys never leave your computer.
-
-#### Q: How do I pause or stop the automation?
-**A:** Simply click the **Pause** or **Stop** buttons in the popup at any time. You can also close the active Indeed tab to immediately halt execution.
 
 ---
 
